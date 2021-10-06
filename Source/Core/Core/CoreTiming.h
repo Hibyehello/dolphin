@@ -73,6 +73,10 @@ enum class FromThread
 void ScheduleEvent(s64 cycles_into_future, EventType* event_type, u64 userdata = 0,
                    FromThread from = FromThread::CPU);
 
+// Anonymous Events do not get persisted to save states like RegularEvents
+// userdata can therefore contain pointers
+void ScheduleAnonymousEvent(s64 cycles_into_future, TimedCallback callback, u64 userdata);
+
 // We only permit one event of each type in the queue at a time.
 void RemoveEvent(EventType* event_type);
 void RemoveAllEvents(EventType* event_type);

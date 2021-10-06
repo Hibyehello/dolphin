@@ -31,20 +31,30 @@ struct EventType
   const std::string* name;
 };
 
-struct Event
+struct SortableEvent
 {
   s64 time;
   u64 fifo_order;
   u64 userdata;
+};
+
+struct Event : public SortableEvent
+{
   EventType* type;
 };
 
+struct AnonEvent : public SortableEvent
+{
+  TimedCallback callback;
+};
+
+
 // Sort by time, unless the times are the same, in which case sort by the order added to the queue
-static bool operator>(const Event& left, const Event& right)
+static bool operator>(const SortableEvent& left, const SortableEvent& right)
 {
   return std::tie(left.time, left.fifo_order) > std::tie(right.time, right.fifo_order);
 }
-static bool operator<(const Event& left, const Event& right)
+static bool operator<(const SortableEvent& left, const SortableEvent& right)
 {
   return std::tie(left.time, left.fifo_order) < std::tie(right.time, right.fifo_order);
 }
@@ -52,6 +62,7 @@ static bool operator<(const Event& left, const Event& right)
 // unordered_map stores each element separately as a linked list node so pointers to elements
 // remain stable regardless of rehashes/resizing.
 static std::unordered_map<std::string, EventType> s_event_types;
+static std::vector<AnonEvent> s_anon_event_queue; // events that don't persist to savestates
 
 // STATE_TO_SAVE
 // The queue is a min-heap using std::make_heap/push_heap/pop_heap.
@@ -218,7 +229,11 @@ void DoState(PointerWrap& p)
   // The exact layout of the heap in memory is implementation defined, therefore it is platform
   // and library version specific.
   if (p.IsReadMode())
-    std::make_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<Event>());
+    std::make_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<SortableEvent>());
+
+  // Anonymous events do not persist across a save state
+  if (p.IsReadMode())
+    s_anon_event_queue.clear();
 }
 
 // This should only be called from the CPU thread. If you are calling
@@ -269,8 +284,8 @@ void ScheduleEvent(s64 cycles_into_future, EventType* event_type, u64 userdata, 
     if (!s_is_global_timer_sane)
       ForceExceptionCheck(cycles_into_future);
 
-    s_event_queue.emplace_back(Event{timeout, s_event_fifo_id++, userdata, event_type});
-    std::push_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<Event>());
+    s_event_queue.emplace_back(Event{{timeout, s_event_fifo_id++, userdata}, event_type});
+    std::push_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<SortableEvent>());
   }
   else
   {
@@ -283,8 +298,22 @@ void ScheduleEvent(s64 cycles_into_future, EventType* event_type, u64 userdata, 
     }
 
     std::lock_guard lk(s_ts_write_lock);
-    s_ts_queue.Push(Event{g.global_timer + cycles_into_future, 0, userdata, event_type});
+    s_ts_queue.Push(Event{{g.global_timer + cycles_into_future, 0, userdata}, event_type});
   }
+}
+
+void ScheduleAnonymousEvent(s64 cycles_into_future, TimedCallback callback, u64 userdata)
+{
+  ASSERT_MSG(POWERPC, Core::IsCPUThread(), "Anonymous event was scheduled from non-cpu thread");
+
+  s64 timeout = GetTicks() + cycles_into_future;
+
+  // If this event needs to be scheduled before the next advance(), force one early
+  if (!s_is_global_timer_sane)
+    ForceExceptionCheck(cycles_into_future);
+
+  s_anon_event_queue.emplace_back(AnonEvent{{timeout, s_event_fifo_id++, userdata}, callback});
+  std::push_heap(s_anon_event_queue.begin(), s_anon_event_queue.end(), std::greater<AnonEvent>());
 }
 
 void RemoveEvent(EventType* event_type)
@@ -296,7 +325,7 @@ void RemoveEvent(EventType* event_type)
   if (itr != s_event_queue.end())
   {
     s_event_queue.erase(itr, s_event_queue.end());
-    std::make_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<Event>());
+    std::make_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<SortableEvent>());
   }
 }
 
@@ -324,8 +353,64 @@ void MoveEvents()
   {
     ev.fifo_order = s_event_fifo_id++;
     s_event_queue.emplace_back(std::move(ev));
-    std::push_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<Event>());
+    std::push_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<SortableEvent>());
   }
+}
+
+struct NextEvent {
+  enum Tag {
+    Event,
+    AnonEvent,
+    None
+  };
+
+  Tag tag;
+  union {
+    struct Event event;
+    struct AnonEvent anon_event;
+  };
+};
+
+// Interleave events from the two event queues
+static NextEvent PopNextEvent() {
+  s64 event_time = std::numeric_limits<s64>::max();
+  if (!s_event_queue.empty())
+    event_time =  s_event_queue.front().time;
+
+  s64 anon_event_time = std::numeric_limits<s64>::max();
+  if (!s_anon_event_queue.empty())
+    anon_event_time =  s_anon_event_queue.front().time;
+
+  NextEvent next { NextEvent::None };
+
+  // regular events take priority over anonymous events
+  if (event_time <= anon_event_time && event_time <= g.global_timer)
+  {
+    next.tag = NextEvent::Event;
+    next.event = std::move(s_event_queue.front());
+    std::pop_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<SortableEvent>());
+    s_event_queue.pop_back();
+  }
+  else if (anon_event_time <= g.global_timer)
+  {
+    next.tag = NextEvent::AnonEvent;
+    next.anon_event = std::move(s_anon_event_queue.front());
+    std::pop_heap(s_anon_event_queue.begin(), s_anon_event_queue.end(), std::greater<SortableEvent>());
+    s_anon_event_queue.pop_back();
+  }
+  return next;
+}
+
+static s64 ClosestEvent() {
+  s64 event_time = std::numeric_limits<s64>::max();
+  if (!s_event_queue.empty())
+    event_time =  s_event_queue.front().time;
+
+  s64 anon_event_time = std::numeric_limits<s64>::max();
+  if (!s_anon_event_queue.empty())
+    anon_event_time =  s_anon_event_queue.front().time;
+
+  return std::min(event_time, anon_event_time);
 }
 
 void Advance()
@@ -336,26 +421,30 @@ void Advance()
   g.global_timer += cyclesExecuted;
   s_last_OC_factor = s_config_OC_factor;
   g.last_OC_factor_inverted = s_config_OC_inv_factor;
-  g.slice_length = MAX_SLICE_LENGTH;
 
   s_is_global_timer_sane = true;
 
-  while (!s_event_queue.empty() && s_event_queue.front().time <= g.global_timer)
+  auto Next = PopNextEvent();
+  while (Next.tag != NextEvent::None)
   {
-    Event evt = std::move(s_event_queue.front());
-    std::pop_heap(s_event_queue.begin(), s_event_queue.end(), std::greater<Event>());
-    s_event_queue.pop_back();
-    evt.type->callback(evt.userdata, g.global_timer - evt.time);
+    switch (Next.tag) {
+    case NextEvent::Event:
+      Next.event.type->callback(Next.event.userdata, g.global_timer - Next.event.time);
+      break;
+    case NextEvent::AnonEvent:
+      Next.anon_event.callback(Next.anon_event.userdata, g.global_timer - Next.anon_event.time);
+      break;
+    case NextEvent::None:
+      break;
+    }
+    Next = PopNextEvent();
   }
 
   s_is_global_timer_sane = false;
 
-  // Still events left (scheduled in the future)
-  if (!s_event_queue.empty())
-  {
-    g.slice_length = static_cast<int>(
-        std::min<s64>(s_event_queue.front().time - g.global_timer, MAX_SLICE_LENGTH));
-  }
+  // Schedule next slice
+  g.slice_length = static_cast<int>(
+      std::min<s64>(ClosestEvent() - g.global_timer, MAX_SLICE_LENGTH));
 
   PowerPC::ppcState.downcount = CyclesToDowncount(g.slice_length);
 
