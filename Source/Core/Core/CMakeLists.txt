@@ -438,6 +438,8 @@ add_library(core
   PowerPC/CachedInterpreter/InterpreterBlockCache.h
   PowerPC/ConditionRegister.cpp
   PowerPC/ConditionRegister.h
+  PowerPC/CPUApi.cpp
+  PowerPC/CPUApi.h
   PowerPC/Interpreter/ExceptionUtils.h
   PowerPC/Interpreter/Interpreter_Branch.cpp
   PowerPC/Interpreter/Interpreter_FloatingPoint.cpp
@@ -593,6 +595,7 @@ PUBLIC
   videosoftware
 
 PRIVATE
+  plugin_cpp
   fmt::fmt
   ${LZO}
   ZLIB::ZLIB

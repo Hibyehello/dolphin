@@ -25,6 +25,7 @@
 #include "Core/HW/CPU.h"
 #include "Core/HW/SystemTimers.h"
 #include "Core/Host.h"
+#include "Core/PowerPC/CPUApi.h"
 #include "Core/PowerPC/CPUCoreBase.h"
 #include "Core/PowerPC/GDBStub.h"
 #include "Core/PowerPC/Interpreter/Interpreter.h"
@@ -266,6 +267,8 @@ void Init(CPUCore cpu_core)
   InitializeCPUCore(cpu_core);
   ppcState.iCache.Init();
 
+  CpuApi::Init();
+
   if (Config::Get(Config::MAIN_ENABLE_DEBUGGING))
     breakpoints.ClearAllTemporary();
 }
@@ -295,6 +298,7 @@ void ScheduleInvalidateCacheThreadSafe(u32 address)
 
 void Shutdown()
 {
+  CpuApi::Shutdown();
   InjectExternalCPUCore(nullptr);
   JitInterface::Shutdown();
   s_interpreter->Shutdown();
