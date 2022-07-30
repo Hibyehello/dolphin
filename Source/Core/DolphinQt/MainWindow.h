@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include "DolphinQt/Config/PluginsWindow.h"
 
 class QStackedWidget;
 class QString;
@@ -149,6 +150,7 @@ private:
   void ShowAudioWindow();
   void ShowControllersWindow();
   void ShowGraphicsWindow();
+  void ShowPluginsWindow();
   void ShowFreeLookWindow();
   void ShowAboutDialog();
   void ShowHotkeyDialog();
@@ -215,6 +217,7 @@ private:
   ControllersWindow* m_controllers_window = nullptr;
   SettingsWindow* m_settings_window = nullptr;
   GraphicsWindow* m_graphics_window = nullptr;
+  PluginsWindow* m_plugins_window = nullptr;
   FIFOPlayerWindow* m_fifo_window = nullptr;
   MappingWindow* m_hotkey_window = nullptr;
   FreeLookWindow* m_freelook_window = nullptr;

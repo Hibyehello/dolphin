@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <locale>
 #include <mutex>
@@ -148,10 +149,10 @@ LogManager::LogManager()
   m_log[LogType::WIIMOTE] = {"Wiimote", "Wii Remote"};
   m_log[LogType::WII_IPC] = {"WII_IPC", "WII IPC"};
   m_log[LogType::SCRIPT] = {"Script", "Script"};
-  m_log[LogType::SCRIPT_HOST] = {"Script Host", "Script Host"};
+  m_log[LogType::SCRIPT_HOST] = {"Script_Host", "Script Host"};
 
   RegisterListener(LogListener::FILE_LISTENER,
-                   new FileLogListener(File::GetUserPath(F_MAINLOG_IDX)));
+                   new FileLogListener(File::GetUserPath(F_MAINLOG_IDX)));               
   RegisterListener(LogListener::CONSOLE_LISTENER, new ConsoleListener());
 
   // Set up log listeners
