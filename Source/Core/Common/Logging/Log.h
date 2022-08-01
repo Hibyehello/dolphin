@@ -66,7 +66,7 @@ enum class LogType : int
   WIIMOTE,
   SCRIPT,
   SCRIPT_HOST,
-
+  
   NUMBER_OF_LOGS  // Must be last
 };
 

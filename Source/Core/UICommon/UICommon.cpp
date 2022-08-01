@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <clocale>
 #include <cmath>
+#include <cstdio>
 #include <iomanip>
 #include <locale>
 #include <memory>
