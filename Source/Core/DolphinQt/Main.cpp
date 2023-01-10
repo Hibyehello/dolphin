@@ -180,7 +180,6 @@ int main(int argc, char* argv[])
                    &app, &Core::HostDispatchJobs);
 
   Plugins::Init();
-  Plugins::GetAllPlugins();
 
   std::optional<std::string> save_state_path;
   if (options.is_set("save_state"))

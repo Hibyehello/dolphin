@@ -16,6 +16,7 @@
 
 #include "Common/FileUtil.h"
 #include "Plugins/PluginHost.h"
+#include "Plugins/PluginManager.h"
 
 
 PluginsWindow::PluginsWindow(QWidget* parent) : QDialog(parent)
@@ -49,12 +50,12 @@ PluginsWindow::PluginsWindow(QWidget* parent) : QDialog(parent)
 
 void PluginsWindow::LoadPluginsList()
 {
-    plugins = Plugins::GetAllPlugins();
-    for(const auto& plugin : plugins)
+    pluginsList = PluginManager::getPlugins();
+    for(const auto& plugin : *pluginsList)
     {
-        QListWidgetItem* item = new QListWidgetItem(QString::fromStdString(plugin.virtualName));
+        QListWidgetItem* item = new QListWidgetItem(QString::fromStdString(plugin.name));
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-        item->setData(Qt::UserRole, QString::fromStdString(plugin.physicalName));
+        item->setData(Qt::UserRole, QString::fromStdString(plugin.mainfile));
         item->setCheckState(plugin.Active ? Qt::Checked : Qt::Unchecked);
         m_plugins_list->addItem(item);
     }
@@ -64,13 +65,13 @@ void PluginsWindow::PluginItemChanged(QListWidgetItem* item)
 {
     const auto plugin_path = item->data(Qt::UserRole).toString();
 
-    for(u32 i = 0; i < plugins.size(); i++)
+    for(u32 i = 0; i < pluginsList->size(); i++)
     {
-        if(plugins.at(i).physicalName == plugin_path.toStdString())
+        if(pluginsList->at(i).mainfile == plugin_path.toStdString())
         {
-            if(!plugins.at(i).Active)
+            if(!pluginsList->at(i).Active)
                 Plugins::LoadPlugin(i);
-            if(plugins.at(i).Active)
+            if(pluginsList->at(i).Active)
                 Plugins::ShutdownPlugin(i);
         }
     }

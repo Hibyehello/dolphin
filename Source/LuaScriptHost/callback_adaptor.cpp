@@ -12,6 +12,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include <string>
+#include <vector>
 #include <mutex>
 
 // FIXME: we shouldn't be using global state

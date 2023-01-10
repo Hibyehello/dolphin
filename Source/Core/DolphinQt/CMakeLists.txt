@@ -374,10 +374,10 @@ PRIVATE
 target_link_libraries(dolphin-emu
 PRIVATE
   core
-  plugins
   Qt${QT_VERSION_MAJOR}::Widgets
   uicommon
   imgui
+  plugins
 )
 
 # Make sure our scripting ABI functions are exported to DLLs

@@ -7,7 +7,7 @@
 #include <QListWidget>
 #include <vector>
 
-#include "Plugins/PluginHost.h"
+#include "Plugins/PluginManager.h"
 
 class PluginsWindow final : public QDialog
 {
@@ -25,5 +25,5 @@ private:
     void PluginItemChanged(QListWidgetItem* item);
 
     QListWidget* m_plugins_list;
-    std::vector<Plugins::PluginFiles> plugins;
+    const std::vector<PluginHost>* pluginsList;
 };

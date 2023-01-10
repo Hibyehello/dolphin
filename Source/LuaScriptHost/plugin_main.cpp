@@ -133,7 +133,7 @@ EXPORTED void plugin_init(RawFunctor* getFunctionPtr) {
     GetModuleDefintion = reinterpret_cast<decltype(GetModuleDefintion)>(GetFunctionPtr("Discovery", 1, "GetModuleDefintion"));
     TestDiscovery();
     printf("Here\n");
-
+    printf("test\n");
     RunLua("script.lua");
 
     printf("LuaScriptHost initialized\n");
