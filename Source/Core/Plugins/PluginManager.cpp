@@ -4,6 +4,7 @@
 #include <fmt/format.h>
 #include <fstream>
 #include <picojson.h>
+#include <iostream>
 #include <sstream>
 
 /*
@@ -21,10 +22,10 @@
 
 void PluginManager::FindAllPlugins()
 {
-  auto PluginDir = File::GetUserPath(D_LOAD_IDX) + "Plugins";
-
+  PluginDir = File::GetUserPath(D_LOAD_IDX) + "Plugins";
   for (const auto& entry : File::ScanDirectoryTree(PluginDir, true).children)
   {
+    std::cerr << "running" << std::endl;
     if (entry.virtualName.find("json") != std::string::npos)
     {
       ParsePluginJSON(entry);
@@ -55,9 +56,9 @@ void PluginManager::ParsePluginJSON(const File::FSTEntry json_in)
     {
       plugin.name = value.get<std::string>();
     } 
-    else if (key == "version" && value.is<float>()) 
+    else if (key == "version" && value.is<double>()) 
     {
-      plugin.version = value.get<float>();
+      plugin.version = value.get<double>();
     }
     else if (key == "dependencies" && value.is<picojson::array>())
     {
@@ -68,7 +69,7 @@ void PluginManager::ParsePluginJSON(const File::FSTEntry json_in)
     }
     else if (key == "mainfile" && value.is<std::string>())
     {
-      plugin.mainfile = value.get<std::string>();
+      plugin.mainfile = PluginDir + "/" + value.get<std::string>();
     }
     else if (key == "scripthost") 
     {
@@ -80,17 +81,28 @@ void PluginManager::ParsePluginJSON(const File::FSTEntry json_in)
           plugin.fileTypes.push_back(fileType.get<std::string>());
         }
       }
-      else if (key == "sandbox" && value.get<float>())
+      else if (key == "sandbox" && value.get<bool>())
       {
         plugin.sandbox = value.get<bool>();
       }
     }
+    plugin.Active = false;
   }
 
-  plugins.push_back(plugin);
+  bool exists = false;
+  for(const auto& Checkplugin : plugins) 
+  {
+    exists = ((Checkplugin.mainfile == plugin.mainfile) && (Checkplugin.name == plugin.name));
+  }
+
+  std::cerr << "exists: " << exists << std::endl;
+
+  if(!exists)
+    plugins.push_back(plugin);
 }
 
-std::vector<PluginHost>* getPlugins()
+std::vector<PluginHost>* PluginManager::getPlugins()
 {
+  FindAllPlugins();
   return &plugins;
 }

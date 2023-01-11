@@ -9,6 +9,7 @@
 
 extern FunctorOwner PluginHostOwner;
 
+std::string PluginDir;
 
 // TODO: Sub-classing a functor is currently way too complex. We need a c++ wrapper to make this simple
 class GetFnPtrFunctor : public Functor<void*(String*, int64_t, String*)>
@@ -44,7 +45,7 @@ struct PluginHost
 {
   // From Plugin json
   std::string name;
-  float version;
+  double version;
   std::vector<std::string> dependencies;
   std::string mainfile;
   bool isScriptHost;

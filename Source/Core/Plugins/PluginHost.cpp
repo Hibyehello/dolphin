@@ -37,7 +37,7 @@ void Plugins::Init()
 }
 
 void Plugins::LoadPlugin(u32 id)
-{
+{       fmt::print("LoadPlugin\n");
         fmt::print("Loading plugin {}\n", plugins.at(id).mainfile);
         // Attempt to load the .so file
         void* handle = dlopen(plugins.at(id).mainfile.c_str(), RTLD_NOW);

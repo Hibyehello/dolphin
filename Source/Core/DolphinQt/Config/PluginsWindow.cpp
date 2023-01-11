@@ -12,7 +12,7 @@
 #include <QPushButton>
 #include <string>
 #include <vector>
-
+#include <iostream>
 
 #include "Common/FileUtil.h"
 #include "Plugins/PluginHost.h"
@@ -28,8 +28,6 @@ PluginsWindow::PluginsWindow(QWidget* parent) : QDialog(parent)
     QHBoxLayout* h_layout = new QHBoxLayout();
 
     m_plugins_list = new QListWidget();
-
-    LoadPluginsList();
 
     QDialogButtonBox* close = new QDialogButtonBox(QDialogButtonBox::Close);
     QPushButton* refresh = new QPushButton(this);
@@ -55,7 +53,11 @@ void PluginsWindow::LoadPluginsList()
     {
         QListWidgetItem* item = new QListWidgetItem(QString::fromStdString(plugin.name));
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-        item->setData(Qt::UserRole, QString::fromStdString(plugin.mainfile));
+        std::cerr << "isScriptHost: "<<plugin.isScriptHost << std::endl;
+        if (plugin.isScriptHost)
+            item->setData(Qt::UserRole, QString::fromStdString(plugin.mainfile + " - scripthost"));
+        else
+            item->setData(Qt::UserRole, QString::fromStdString(plugin.mainfile));
         item->setCheckState(plugin.Active ? Qt::Checked : Qt::Unchecked);
         m_plugins_list->addItem(item);
     }
