@@ -15,6 +15,8 @@
 
 namespace Plugins {
 
+std::vector<PluginHost>* pluginsList;
+
 void Init();
 void LoadPlugin(u32 id);
 void ShutdownPlugin(u32 id);

@@ -37,47 +37,48 @@ void Plugins::Init()
 }
 
 void Plugins::LoadPlugin(u32 id)
-{       fmt::print("LoadPlugin\n");
-        fmt::print("Loading plugin {}\n", plugins.at(id).mainfile);
+{       
+        pluginsList = PluginManager::getPlugins();
+        fmt::print("Loading plugin {}\n", pluginsList->at(id).mainfile);
         // Attempt to load the .so file
-        void* handle = dlopen(plugins.at(id).mainfile.c_str(), RTLD_NOW);
+        void* handle = dlopen(pluginsList->at(id).mainfile.c_str(), RTLD_NOW);
 
         if (!handle)
         {
-            fmt::print("dlopen of {} failed: {}\n", plugins.at(id).mainfile, dlerror());
+            fmt::print("dlopen of {} failed: {}\n", pluginsList->at(id).mainfile, dlerror());
             return;
         }
 
 
 
         // Locate the plugin_init function
-        plugins.at(id).plugin_init = reinterpret_cast<void (*)(void*)>(dlsym(handle, "plugin_init"));
-        plugins.at(id).plugin_requestShutdown = reinterpret_cast<void (*)(uint64_t)>(dlsym(handle, "plugin_requestShutdown"));
+        pluginsList->at(id).plugin_init = reinterpret_cast<void (*)(void*)>(dlsym(handle, "plugin_init"));
+        pluginsList->at(id).plugin_requestShutdown = reinterpret_cast<void (*)(uint64_t)>(dlsym(handle, "plugin_requestShutdown"));
 
-        if (!plugins.at(id).plugin_init)
+        if (!pluginsList->at(id).plugin_init)
         {
-            fmt::print("{} did not contain plugin_init function: {}\n", plugins.at(id).mainfile, dlerror());
+            fmt::print("{} did not contain plugin_init function: {}\n", pluginsList->at(id).mainfile, dlerror());
             return;
         }
 
-        if (!plugins.at(id).plugin_requestShutdown)
+        if (!pluginsList->at(id).plugin_requestShutdown)
         {
-            fmt::print("{} did not contain plugin_requestShutdown function: {}\n", plugins.at(id).mainfile, dlerror());
+            fmt::print("{} did not contain plugin_requestShutdown function: {}\n", pluginsList->at(id).mainfile, dlerror());
             return;
         }
 
-        plugins.at(id).Active = true;
-        plugins.at(id).ModuleId = Module_id++;
+        pluginsList->at(id).Active = true;
+        pluginsList->at(id).ModuleId = Module_id++;
 
-        plugins.at(id).FnPtrFunctor = GetFnPtrFunctor(id);
+        pluginsList->at(id).FnPtrFunctor = GetFnPtrFunctor(id);
 
         // Actually call the plugin_init method
-        plugins.at(id).plugin_init(plugins.at(id).FnPtrFunctor);
+        pluginsList->at(id).plugin_init(pluginsList->at(id).FnPtrFunctor);
 }
 
 void Plugins::ShutdownPlugin(u32 id)
 {
-    fmt::print("Requesting shutdown of {}\n", plugins.at(id).name);
-    plugins.at(id).Active = false;
-    plugins.at(id).plugin_requestShutdown(Module_id);
+    fmt::print("Requesting shutdown of {}\n", pluginsList->at(id).name);
+    pluginsList->at(id).Active = false;
+    pluginsList->at(id).plugin_requestShutdown(Module_id);
 }
