@@ -50,6 +50,8 @@ void PluginManager::ParsePluginJSON(const File::FSTEntry json_in)
 
   const auto error = picojson::parse(json, ss.str());
 
+  plugin.isScriptHost = false;
+  
   for (const auto& [key, value] : json.get<picojson::object>()) 
   {
     if (key == "name" && value.is<std::string>())

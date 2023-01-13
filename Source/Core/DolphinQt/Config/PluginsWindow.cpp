@@ -51,12 +51,15 @@ void PluginsWindow::LoadPluginsList()
     pluginsList = PluginManager::getPlugins();
     for(const auto& plugin : *pluginsList)
     {
-        QListWidgetItem* item = new QListWidgetItem(QString::fromStdString(plugin.name));
+        QListWidgetItem* item = new QListWidgetItem();;
+        if(plugin.isScriptHost == 1) {
+            item->setText(QString::fromStdString(plugin.name + " - ScriptHost"));
+        }
+        else {
+            item->setText(QString::fromStdString(plugin.name));
+        }
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
         std::cerr << "isScriptHost: "<<plugin.isScriptHost << std::endl;
-        // if (plugin.isScriptHost)
-        //     item->setData(Qt::UserRole, QString::fromStdString(plugin.mainfile + " - scripthost"));
-        // else
         item->setData(Qt::UserRole, QString::fromStdString(plugin.mainfile));
         item->setCheckState(plugin.Active ? Qt::Checked : Qt::Unchecked);
         m_plugins_list->addItem(item);
@@ -71,7 +74,6 @@ void PluginsWindow::PluginItemChanged(QListWidgetItem* item)
     {
         if(pluginsList->at(i).mainfile == plugin_path.toStdString())
         {
-            std::cerr << i << ": " << pluginsList->at(i).mainfile << " " << pluginsList->at(i).Active << std::endl;
             if(!pluginsList->at(i).Active)
                 Plugins::LoadPlugin(i);
             if(pluginsList->at(i).Active)
