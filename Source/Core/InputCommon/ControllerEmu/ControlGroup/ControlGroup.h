@@ -88,7 +88,7 @@ public:
   template <typename T>
   static T ApplyDeadzone(T input, std::common_type_t<T> deadzone)
   {
-    return std::copysign(std::max(T{0}, std::abs(input) - deadzone) / (T{1} - deadzone), input);
+    return ::copysign(std::max(T{0}, std::abs(input) - deadzone) / (T{1} - deadzone), input);
   }
 
   const std::string name;

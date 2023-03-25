@@ -124,6 +124,52 @@ void WiiIRManip::PerformInputManip(WiimoteCommon::DataReportBuilder& rpt, int co
   CameraLogic::WriteIRDataForTransform(ir_data, mode, fov, transform);
 }
 
+WiimoteEmu::Nunchuk::DataFormat NunchuckButtonsManip::Get(int controller_id)
+{
+  auto iter = m_overrides.find(controller_id);
+  if (iter != m_overrides.end())
+    return iter->second.button_data;
+  return m_nunchuk_state[controller_id];
+}
+
+void NunchuckButtonsManip::Set(WiimoteEmu::Nunchuk::DataFormat button_data, int controller_id,
+                               ClearOn clear_on)
+{
+  m_overrides[controller_id] = {button_data, clear_on, /* used: */ false};
+}
+
+void NunchuckButtonsManip::PerformInputManip(WiimoteCommon::DataReportBuilder& rpt,
+                                             int controller_id, WiimoteEmu::EncryptionKey key)
+{
+  if (!rpt.HasCore())
+  {
+    return;
+  }
+  auto iter = m_overrides.find(controller_id);
+  if (iter == m_overrides.end())
+  {
+    return;
+  }
+  NunchuckButtonsOverride& input_overrides = iter->second;
+
+  auto nunchuk = reinterpret_cast<WiimoteEmu::Nunchuk::DataFormat*>(rpt.GetExtDataPtr());
+  key.Decrypt((u8*)nunchuk, 0, sizeof(*nunchuk));
+  *nunchuk = input_overrides.button_data;
+  key.Encrypt((u8*)nunchuk, 0, sizeof(*nunchuk));
+}
+
+// There doesn't seem to be an easy way to grab the state of the Nunchuck at a later point
+// For now, let's save the state of the nunchuck inside the manip class.
+// This is only relevant for get_nunchuck_buttons API.
+void NunchuckButtonsManip::SaveNunchuckState(WiimoteCommon::DataReportBuilder& rpt,
+                                             int controller_id, WiimoteEmu::EncryptionKey key)
+{
+  auto nunchuk = reinterpret_cast<WiimoteEmu::Nunchuk::DataFormat*>(rpt.GetExtDataPtr());
+  key.Decrypt((u8*)nunchuk, 0, sizeof(*nunchuk));
+  m_nunchuk_state[controller_id] = *nunchuk;
+  key.Encrypt((u8*)nunchuk, 0, sizeof(*nunchuk));
+}
+
 GCManip& GetGCManip()
 {
   static GCManip manip(GetEventHub());
@@ -139,6 +185,12 @@ WiiButtonsManip& GetWiiButtonsManip()
 WiiIRManip& GetWiiIRManip()
 {
   static WiiIRManip manip(GetEventHub());
+  return manip;
+}
+
+NunchuckButtonsManip& GetNunchuckButtonsManip()
+{
+  static NunchuckButtonsManip manip(GetEventHub());
   return manip;
 }
 

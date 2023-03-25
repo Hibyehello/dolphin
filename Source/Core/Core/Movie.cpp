@@ -579,7 +579,7 @@ bool BeginRecordingInput(const ControllerTypeArray& controllers,
       if (File::Exists(save_path))
         File::Delete(save_path);
 
-      State::SaveAs(save_path);
+      State::SaveFile(save_path);
       s_bRecordingFromSaveState = true;
 
       std::thread md5thread(GetMD5);
@@ -1278,8 +1278,7 @@ void PlayController(GCPadStatus* PadStatus, int controllerID)
 }
 
 // NOTE: CPU Thread
-bool PlayWiimote(int wiimote, WiimoteCommon::DataReportBuilder& rpt, int ext,
-                 const EncryptionKey& key)
+bool PlayWiimote(int wiimote, WiimoteCommon::DataReportBuilder& rpt)
 {
   if (!IsPlayingInput() || !IsUsingWiimote(wiimote) || s_temp_input.empty())
     return false;

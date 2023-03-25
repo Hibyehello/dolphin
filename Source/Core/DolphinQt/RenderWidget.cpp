@@ -130,7 +130,7 @@ void RenderWidget::dropEvent(QDropEvent* event)
     return;
   }
 
-  State::LoadAs(path.toStdString());
+  State::LoadFile(path.toStdString());
 }
 
 void RenderWidget::OnHideCursorChanged()

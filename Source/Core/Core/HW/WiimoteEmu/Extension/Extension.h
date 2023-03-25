@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include "Core/HW/WiimoteEmu/Extension/Extension.h"
-
 #include <array>
 #include <string>
 

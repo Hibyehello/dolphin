@@ -506,7 +506,7 @@ void Wiimote::SendDataReport()
   DataReportBuilder rpt_builder(m_reporting_mode);
 
   if (Movie::IsPlayingInput() &&
-      Movie::PlayWiimote(m_index, rpt_builder, m_active_extension, GetExtensionEncryptionKey()))
+      Movie::PlayWiimote(m_index, rpt_builder))
   {
     // Update buttons in status struct from movie:
     rpt_builder.GetCoreData(&m_status.buttons);
@@ -586,6 +586,12 @@ void Wiimote::SendDataReport()
     Movie::CallWiiInputManip(rpt_builder, m_index, m_active_extension, GetExtensionEncryptionKey());
     API::GetWiiButtonsManip().PerformInputManip(rpt_builder, m_index);
     API::GetWiiIRManip().PerformInputManip(rpt_builder, m_index);
+
+    if (rpt_builder.HasExt() && GetActiveExtensionNumber() == NUNCHUK)
+    {
+      API::GetNunchuckButtonsManip().PerformInputManip(rpt_builder, m_index,
+                                                       GetExtensionEncryptionKey());
+    }
   }
 
   if (NetPlay::IsNetPlayRunning())
@@ -598,6 +604,12 @@ void Wiimote::SendDataReport()
   }
 
   Movie::CheckWiimoteStatus(m_index, rpt_builder, m_active_extension, GetExtensionEncryptionKey());
+
+  if (rpt_builder.HasExt() && GetActiveExtensionNumber() == NUNCHUK)
+  {
+    API::GetNunchuckButtonsManip().SaveNunchuckState(rpt_builder, m_index,
+                                                     GetExtensionEncryptionKey());
+  }
 
   // Send the report:
   InterruptDataInputCallback(rpt_builder.GetDataPtr(), rpt_builder.GetDataSize());

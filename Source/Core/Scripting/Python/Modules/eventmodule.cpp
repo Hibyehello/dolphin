@@ -61,7 +61,13 @@ struct GenericEventModuleState
   }
 };
 using EventModuleState = GenericEventModuleState<
-  API::Events::FrameAdvance, API::Events::MemoryBreakpoint, API::Events::CodeBreakpoint, API::Events::FrameDrawn>;
+  API::Events::FrameAdvance,
+  API::Events::FrameDrawn,
+  API::Events::MemoryBreakpoint,
+  API::Events::CodeBreakpoint,
+  API::Events::SaveStateSave,
+  API::Events::SaveStateLoad
+>;
 
 // These template shenanigans are all required for PyEventFromMappingFunc
 // to be able to infer all of the mapping function signature's parts
@@ -223,6 +229,13 @@ static const std::tuple<> PyFrameAdvance(const API::Events::FrameAdvance& evt)
 {
   return std::make_tuple();
 }
+static const std::tuple<u32, u32, PyObject*> PyFrameDrawn(const API::Events::FrameDrawn& evt)
+{
+  const u32 num_bytes = evt.width * evt.height * 4;
+  auto data = reinterpret_cast<const char*>(evt.data);
+  PyObject* pybytes = PyBytes_FromStringAndSize(data, num_bytes);
+  return std::make_tuple(evt.width, evt.height, pybytes);
+}
 static const std::tuple<bool, u32, u64> PyMemoryBreakpoint(const API::Events::MemoryBreakpoint& evt)
 {
   return std::make_tuple(evt.write, evt.addr, evt.value);
@@ -231,28 +244,44 @@ static const std::tuple<u32> PyCodeBreakpoint(const API::Events::CodeBreakpoint&
 {
   return std::make_tuple(evt.addr);
 }
-static const std::tuple<u32, u32, PyObject*> PyFrameDrawn(const API::Events::FrameDrawn& evt)
+static const std::tuple<bool, u32> PySaveStateSave(const API::Events::SaveStateSave& evt)
 {
-  const u32 num_bytes = evt.width * evt.height * 4;
-  auto data = reinterpret_cast<const char*>(evt.data);
-  PyObject* pybytes = PyBytes_FromStringAndSize(data, num_bytes);
-  return std::make_tuple(evt.width, evt.height, pybytes);
+  return std::make_tuple(evt.toSlot, evt.slot);
+}
+static const std::tuple<bool, u32> PySaveStateLoad(const API::Events::SaveStateLoad& evt)
+{
+  return std::make_tuple(evt.fromSlot, evt.slot);
 }
 // EVENT DEFINITIONS
 // Creates a PyEvent class from the signature.
 using PyFrameAdvanceEvent = PyEventFromMappingFunc<PyFrameAdvance>;
+using PyFrameDrawnEvent = PyEventFromMappingFunc<PyFrameDrawn>;
 using PyMemoryBreakpointEvent = PyEventFromMappingFunc<PyMemoryBreakpoint>;
 using PyCodeBreakpointEvent = PyEventFromMappingFunc<PyCodeBreakpoint>;
-using PyFrameDrawnEvent = PyEventFromMappingFunc<PyFrameDrawn>;
+using PySaveStateSaveEvent = PyEventFromMappingFunc<PySaveStateSave>;
+using PySaveStateLoadEvent = PyEventFromMappingFunc<PySaveStateLoad>;
 
 // HOOKING UP PY EVENTS TO DOLPHIN EVENTS
 // For all python events listed here, listens to the respective API::Events event
 // deduced from the PyEvent signature's input argument.
-using EventContainer =
-    PythonEventContainer<PyFrameAdvanceEvent, PyMemoryBreakpointEvent, PyCodeBreakpointEvent, PyFrameDrawnEvent>;
+using EventTuple = std::tuple<
+  PyFrameAdvanceEvent,
+  PyFrameDrawnEvent,
+  PyMemoryBreakpointEvent,
+  PyCodeBreakpointEvent,
+  PySaveStateSaveEvent,
+  PySaveStateLoadEvent
+  >;
+using EventContainer = PythonEventContainer<
+  PyFrameAdvanceEvent,
+  PyFrameDrawnEvent,
+  PyMemoryBreakpointEvent,
+  PyCodeBreakpointEvent,
+  PySaveStateSaveEvent,
+  PySaveStateLoadEvent
+>;
 template <>
-const std::tuple<PyFrameAdvanceEvent, PyMemoryBreakpointEvent, PyCodeBreakpointEvent, PyFrameDrawnEvent>
-    EventContainer::s_pyevents = {};
+const EventTuple EventContainer::s_pyevents = {};
 
 std::optional<CoroutineScheduler> GetCoroutineScheduler(std::string aeventname)
 {
@@ -261,9 +290,11 @@ std::optional<CoroutineScheduler> GetCoroutineScheduler(std::string aeventname)
       // All async-awaitable events must be listed twice:
       // Here, and under the same name in the setup python code
       {"frameadvance", PyFrameAdvanceEvent::ScheduleCoroutine},
+      {"framedrawn", PyFrameDrawnEvent::ScheduleCoroutine},
       {"memorybreakpoint", PyMemoryBreakpointEvent::ScheduleCoroutine},
       {"codebreakpoint", PyCodeBreakpointEvent::ScheduleCoroutine},
-      {"framedrawn", PyFrameDrawnEvent::ScheduleCoroutine},
+      {"savestatesave", PySaveStateSaveEvent::ScheduleCoroutine},
+      {"savestateload", PySaveStateLoadEvent::ScheduleCoroutine},
   };
   auto iter = lookup.find(aeventname);
   if (iter == lookup.end())
@@ -293,6 +324,12 @@ async def codebreakpoint():
 
 async def framedrawn():
     return (await _DolphinAsyncEvent("framedrawn"))
+
+async def savestatesave():
+    return (await _DolphinAsyncEvent("savestatesave"))
+
+async def savestateload():
+    return (await _DolphinAsyncEvent("savestateload"))
 )";
   Py::Object result = Py::LoadPyCodeIntoModule(module, pycode);
   if (result.IsNull())
@@ -328,9 +365,11 @@ PyMODINIT_FUNC PyInit_event()
       // EVENT CALLBACKS
       // Has "on_"-prefix, let's python code register a callback
       Py::MakeMethodDef<PyFrameAdvanceEvent::SetCallback>("on_frameadvance"),
+      Py::MakeMethodDef<PyFrameDrawnEvent::SetCallback>("on_framedrawn"),
       Py::MakeMethodDef<PyMemoryBreakpointEvent::SetCallback>("on_memorybreakpoint"),
       Py::MakeMethodDef<PyCodeBreakpointEvent::SetCallback>("on_codebreakpoint"),
-      Py::MakeMethodDef<PyFrameDrawnEvent::SetCallback>("on_framedrawn"),
+      Py::MakeMethodDef<PySaveStateSaveEvent::SetCallback>("on_savestatesave"),
+      Py::MakeMethodDef<PySaveStateLoadEvent::SetCallback>("on_savestateload"),
       Py::MakeMethodDef<Reset>("_dolphin_reset"),
       Py::MakeMethodDef<SystemReset>("system_reset"),
 

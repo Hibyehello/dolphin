@@ -366,7 +366,7 @@ static void CpuThread(const std::optional<std::string>& savestate_path, bool del
 
   if (savestate_path)
   {
-    ::State::LoadAs(*savestate_path);
+    ::State::LoadFile(*savestate_path);
     if (delete_savestate)
       File::Delete(*savestate_path);
   }

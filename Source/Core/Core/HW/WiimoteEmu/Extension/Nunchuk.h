@@ -111,7 +111,7 @@ public:
 
     // buttons + accelerometer LSBs
     ButtonFormat bt;
-  };
+  } data_format;
   static_assert(sizeof(DataFormat) == 6, "Wrong size");
 
   struct CalibrationData

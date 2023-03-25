@@ -292,7 +292,7 @@ MainWindow::MainWindow(std::unique_ptr<BootParameters> boot_parameters,
 
   if (script.has_value())
   {
-    m_scripting_widget->AddScript(script.value());
+    m_scripting_widget->AddScript(script.value(), true);
   }
 }
 
@@ -1324,7 +1324,7 @@ void MainWindow::StateLoad()
   QString path =
       DolphinFileDialog::getOpenFileName(this, tr("Select a File"), QDir::currentPath(),
                                          tr("All Save States (*.sav *.s##);; All Files (*)"));
-  State::LoadAs(path.toStdString());
+  State::LoadFile(path.toStdString());
 }
 
 void MainWindow::StateSave()
@@ -1332,7 +1332,7 @@ void MainWindow::StateSave()
   QString path =
       DolphinFileDialog::getSaveFileName(this, tr("Select a File"), QDir::currentPath(),
                                          tr("All Save States (*.sav *.s##);; All Files (*)"));
-  State::SaveAs(path.toStdString());
+  State::SaveFile(path.toStdString());
 }
 
 void MainWindow::StateLoadSlot()

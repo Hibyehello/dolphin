@@ -43,6 +43,16 @@ struct ClearInterrupt
 {
   u32 cause_mask;
 };
+struct SaveStateSave
+{
+  bool toSlot;
+  int slot;
+};
+struct SaveStateLoad
+{
+  bool fromSlot;
+  int slot;
+};
 
 }  // namespace API::Events
 
@@ -180,8 +190,16 @@ private:
 };
 
 // all existing events need to be listed here, otherwise there will be spooky templating errors
-using EventHub = GenericEventHub<Events::FrameAdvance, Events::FrameDrawn, Events::SetInterrupt, Events::ClearInterrupt,
-                                 Events::MemoryBreakpoint, Events::CodeBreakpoint>;
+using EventHub = GenericEventHub<
+  Events::FrameAdvance,
+  Events::FrameDrawn,
+  Events::MemoryBreakpoint,
+  Events::CodeBreakpoint,
+  Events::SetInterrupt,
+  Events::ClearInterrupt,
+  Events::SaveStateSave,
+  Events::SaveStateLoad
+>;
 
 // global event hub
 EventHub& GetEventHub();

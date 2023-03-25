@@ -59,7 +59,7 @@ static PyObject* SaveToFile(PyObject* self, PyObject* args)
   if (!filename_opt.has_value())
     return nullptr;
   const char* filename = std::get<0>(filename_opt.value());
-  State::SaveAs(std::string(filename));
+  State::SaveFile(std::string(filename));
   Py_RETURN_NONE;
 }
 
@@ -71,7 +71,7 @@ static PyObject* LoadFromFile(PyObject* self, PyObject* args)
   if (!filename_opt.has_value())
     return nullptr;
   const char* filename = std::get<0>(filename_opt.value());
-  State::LoadAs(std::string(filename));
+  State::LoadFile(std::string(filename));
   Py_RETURN_NONE;
 }
 
