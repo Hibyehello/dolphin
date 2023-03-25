@@ -6,6 +6,7 @@
 
 #include <sstream>
 
+#include "Common/FileUtil.h"
 #include "Common/Logging/Log.h"
 #include "Scripting/Python/Utils/module.h"
 

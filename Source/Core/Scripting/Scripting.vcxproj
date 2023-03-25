@@ -27,6 +27,7 @@
     <ClCompile Include="Python\Modules\doliomodule.cpp" />
     <ClCompile Include="Python\Modules\dolphinmodule.cpp" />
     <ClCompile Include="Python\Modules\eventmodule.cpp" />
+    <ClCompile Include="Python\Modules\filemodule.cpp" />
     <ClCompile Include="Python\Modules\guimodule.cpp" />
     <ClCompile Include="Python\Modules\memorymodule.cpp" />
     <ClCompile Include="Python\Modules\savestatemodule.cpp" />
@@ -41,6 +42,7 @@
     <ClInclude Include="Python\Modules\doliomodule.h" />
     <ClInclude Include="Python\Modules\dolphinmodule.h" />
     <ClInclude Include="Python\Modules\eventmodule.h" />
+    <ClInclude Include="Python\Modules\filemodule.h" />
     <ClInclude Include="Python\Modules\guimodule.h" />
     <ClInclude Include="Python\Modules\memorymodule.h" />
     <ClInclude Include="Python\Modules\savestatemodule.h" />
