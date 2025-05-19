@@ -128,8 +128,6 @@ void DeclareAsCPUThread();
 void UndeclareAsCPUThread();
 void DeclareAsGPUThread();
 void UndeclareAsGPUThread();
-void DeclareAsHostThread();
-void UndeclareAsHostThread();
 
 std::string StopMessage(bool main_thread, std::string_view message);
 
@@ -142,7 +140,6 @@ bool IsUninitialized(Core::System& system);
 
 bool IsCPUThread();  // this tells us whether we are the CPU thread.
 bool IsGPUThread();
-bool IsHostThread();
 
 bool WantsDeterminism();
 
