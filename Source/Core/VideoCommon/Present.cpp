@@ -888,6 +888,41 @@ void Presenter::Present(std::optional<TimePoint> presentation_time)
   g_gfx->EndUtilityDrawing();
 }
 
+void Presenter::PresentUI(std::optional<TimePoint> presentation_time) {
+  if(g_gfx->IsHeadless())
+    return;
+
+  g_vertex_manager->Flush();
+
+  UpdateDrawRectangle();
+
+  g_gfx->BeginUtilityDrawing();
+  const bool backbuffer_bound = g_gfx->BindBackbuffer({{0.0f, 0.0f, 0.0f, 1.0f}});
+
+  if (m_onscreen_ui)
+  {
+    m_onscreen_ui->Finalize();
+    if (backbuffer_bound)
+      m_onscreen_ui->DrawImGui();
+  }
+
+  // Present to the window system.
+  {
+    std::lock_guard<std::mutex> guard(m_swap_mutex);
+
+    if (presentation_time.has_value())
+      Core::System::GetInstance().GetCoreTiming().SleepUntil(*presentation_time);
+
+    g_gfx->PresentBackbuffer();
+
+  }
+
+  if (m_onscreen_ui)
+    m_onscreen_ui->BeginImGuiFrame(m_backbuffer_width, m_backbuffer_height);
+
+  g_gfx->EndUtilityDrawing();
+}
+
 void Presenter::SetKeyMap(const DolphinKeyMap& key_map)
 {
   if (m_onscreen_ui)

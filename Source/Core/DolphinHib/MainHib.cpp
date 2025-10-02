@@ -15,6 +15,7 @@
 
 #include "Common/ScopeGuard.h"
 #include "Common/StringUtil.h"
+#include "Common/Thread.h"
 #include "Core/Boot/Boot.h"
 #include "Core/BootManager.h"
 #include "Core/Core.h"
@@ -165,9 +166,13 @@ static void HibThread(WindowSystemInfo wsi) {
     }
 
     while(s_platform->IsRunning()) {
-        g_presenter->Present();
 
-        ImGui::ShowDemoWindow();
+        ImGui::Begin("Dolphin", NULL, ImGuiWindowFlags_NoTitleBar);
+        ImGui::Button("Click me!");
+        ImGui::End();
+
+        g_presenter->PresentUI();
+        Common::SleepCurrentThread(16);
     }
 
     g_video_backend->Shutdown();
