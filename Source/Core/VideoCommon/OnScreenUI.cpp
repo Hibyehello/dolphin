@@ -543,7 +543,7 @@ void OnScreenUI::SetKeyMap(const DolphinKeyMap& key_map)
   }
 }
 
-void OnScreenUI::SetKey(u32 key, bool is_down, const char* chars)
+bool OnScreenUI::SetKey(u32 key, bool is_down, const char* chars)
 {
   auto lock = GetImGuiLock();
   if (auto iter = m_dolphin_to_imgui_map.find(key); iter != m_dolphin_to_imgui_map.end())
@@ -551,6 +551,8 @@ void OnScreenUI::SetKey(u32 key, bool is_down, const char* chars)
 
   if (chars)
     ImGui::GetIO().AddInputCharactersUTF8(chars);
+
+  return ImGui::GetIO().WantCaptureKeyboard;
 }
 
 void OnScreenUI::SetMousePos(float x, float y)
@@ -568,6 +570,13 @@ void OnScreenUI::SetMousePress(u32 button_mask)
   {
     ImGui::GetIO().AddMouseButtonEvent(static_cast<int>(i), (button_mask & (1u << i)) != 0);
   }
+}
+
+void OnScreenUI::SetMouseScroll(float wheel_x, float wheel_y)
+{
+  auto lock = GetImGuiLock();
+
+  ImGui::GetIO().AddMouseWheelEvent(wheel_x, wheel_y);
 }
 
 }  // namespace VideoCommon

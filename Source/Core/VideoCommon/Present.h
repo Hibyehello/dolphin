@@ -88,9 +88,10 @@ public:
 
   void SetKeyMap(const DolphinKeyMap& key_map);
 
-  void SetKey(u32 key, bool is_down, const char* chars);
+  bool SetKey(u32 key, bool is_down, const char* chars);
   void SetMousePos(float x, float y);
   void SetMousePress(u32 button_mask);
+  void SetMouseScroll(float wheel_x, float wheel_y);
 
   int FrameCount() const { return m_frame_count; }
 

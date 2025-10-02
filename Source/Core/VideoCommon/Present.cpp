@@ -894,10 +894,12 @@ void Presenter::SetKeyMap(const DolphinKeyMap& key_map)
     m_onscreen_ui->SetKeyMap(key_map);
 }
 
-void Presenter::SetKey(u32 key, bool is_down, const char* chars)
+bool Presenter::SetKey(u32 key, bool is_down, const char* chars)
 {
   if (m_onscreen_ui)
-    m_onscreen_ui->SetKey(key, is_down, chars);
+    return m_onscreen_ui->SetKey(key, is_down, chars);
+
+  return false;
 }
 
 void Presenter::SetMousePos(float x, float y)
@@ -910,6 +912,12 @@ void Presenter::SetMousePress(u32 button_mask)
 {
   if (m_onscreen_ui)
     m_onscreen_ui->SetMousePress(button_mask);
+}
+
+void Presenter::SetMouseScroll(float wheel_x, float wheel_y)
+{
+  if (m_onscreen_ui)
+    m_onscreen_ui->SetMouseScroll(wheel_x, wheel_y);
 }
 
 void Presenter::DoState(PointerWrap& p)

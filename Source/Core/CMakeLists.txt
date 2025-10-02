@@ -7,6 +7,10 @@ add_subdirectory(UICommon)
 add_subdirectory(VideoCommon)
 add_subdirectory(VideoBackends)
 
+if(ENABLE_NOGUI OR ENABLE_CUSTOM)
+  add_subdirectory(PlatformCommon)
+endif()
+
 if(ENABLE_NOGUI)
   add_subdirectory(DolphinNoGUI)
 endif()
@@ -17,6 +21,10 @@ endif()
 
 if(ENABLE_QT)
   add_subdirectory(DolphinQt)
+endif()
+
+if(ENABLE_CUSTOM)
+  add_subdirectory(DolphinHib)
 endif()
 
 if (APPLE OR WIN32)

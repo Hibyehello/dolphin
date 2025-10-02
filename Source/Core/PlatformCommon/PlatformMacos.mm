@@ -1,7 +1,7 @@
 // Copyright 2023 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include "DolphinNoGUI/Platform.h"
+#include "PlatformCommon/Platform.h"
 
 #include "Common/MsgHandler.h"
 #include "Core/Config/MainSettings.h"
@@ -137,6 +137,7 @@ private:
   void UpdateWindowPosition();
   void HandleSaveStates(NSUInteger key, NSUInteger flags);
   void SetupMenu();
+  bool PassEventToPresenter(NSEvent* event);
 
   NSRect m_window_rect;
   NSWindow* m_window;
@@ -149,6 +150,7 @@ private:
   unsigned int m_window_width = Config::Get(Config::MAIN_RENDER_WINDOW_WIDTH);
   unsigned int m_window_height = Config::Get(Config::MAIN_RENDER_WINDOW_HEIGHT);
   bool m_window_fullscreen = Config::Get(Config::MAIN_FULLSCREEN);
+  bool m_key_map_set = false;
 };
 
 PlatformMacOS::~PlatformMacOS()
@@ -224,6 +226,7 @@ void PlatformMacOS::SetTitle(const std::string& title)
 
 void PlatformMacOS::MainLoop()
 {
+
   while (IsRunning())
   {
     UpdateRunningFlag();
@@ -255,7 +258,8 @@ void PlatformMacOS::ProcessEvents()
                                            inMode:NSDefaultRunLoopMode
                                           dequeue:YES];
 
-    [NSApp sendEvent:event];
+    if(!PassEventToPresenter(event))
+      [NSApp sendEvent:event];
 
     // Need to update if m_window becomes fullscreen
     m_window_fullscreen = [m_window styleMask] & NSWindowStyleMaskFullScreen;
@@ -276,6 +280,69 @@ void PlatformMacOS::ProcessEvents()
         [NSCursor hide];
     }
   }
+}
+
+bool PlatformMacOS::PassEventToPresenter(NSEvent* event)
+{
+  if(!g_presenter) return false;
+
+  if(!m_key_map_set)
+  {
+    static constexpr DolphinKeyMap key_map = {
+      kVK_Tab, kVK_LeftArrow, kVK_RightArrow, kVK_UpArrow, kVK_DownArrow,
+      kVK_PageUp, kVK_PageDown, kVK_Home, kVK_End, kVK_Help,
+      kVK_ForwardDelete, kVK_Delete, kVK_Space, kVK_Return, kVK_Escape,
+      kVK_ANSI_KeypadEnter,  // Keypad enter
+      kVK_ANSI_A, kVK_ANSI_C, kVK_ANSI_V, kVK_ANSI_X, kVK_ANSI_Y,
+      kVK_ANSI_Z,
+    };
+
+    g_presenter->SetKeyMap(key_map);
+  }
+
+  int width = [[NSScreen mainScreen] frame].size.width;
+  int height = [[NSScreen mainScreen] frame].size.height;
+  double contentHeight = [m_window contentRectForFrameRect:[m_window frame]].size.height;
+  switch(event.type)
+  {
+    case NSEventTypeKeyDown:
+    case NSEventTypeKeyUp:
+    {
+      const bool is_down = event.type == NSEventTypeKeyDown;
+      const char* chars = nullptr;
+
+      if (is_down)
+      {
+        chars = [event.characters UTF8String];
+      }
+      return g_presenter->SetKey((u32)event.keyCode, is_down, chars);
+    }
+    break;
+    case NSEventTypeLeftMouseDragged:
+    case NSEventTypeRightMouseDragged:
+    case NSEventTypeMouseMoved:
+    {
+      CGPoint local_point = [[m_window contentView] convertPoint:[event locationInWindow] fromView:nil];
+
+      local_point.y = (float)contentHeight - local_point.y; //Need to flip vertically
+      g_presenter->SetMousePos(local_point.x, local_point.y);
+    }
+    break;
+    case NSEventTypeLeftMouseDown:
+    case NSEventTypeRightMouseDown:
+      g_presenter->SetMousePress(event.buttonNumber+1);
+    break;
+    case NSEventTypeLeftMouseUp:
+    case NSEventTypeRightMouseUp:
+      g_presenter->SetMousePress(0);
+    break;
+    case NSEventTypeScrollWheel:
+      g_presenter->SetMouseScroll(event.deltaX, event.deltaY);
+    break;
+    default: 
+      return false;
+  }
+  return false;
 }
 
 void PlatformMacOS::UpdateWindowPosition()

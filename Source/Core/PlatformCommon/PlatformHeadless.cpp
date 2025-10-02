@@ -6,7 +6,7 @@
 
 #include "Core/Core.h"
 #include "Core/System.h"
-#include "DolphinNoGUI/Platform.h"
+#include "PlatformCommon/Platform.h"
 
 namespace
 {
