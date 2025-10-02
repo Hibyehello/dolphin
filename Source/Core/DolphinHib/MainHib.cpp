@@ -169,6 +169,8 @@ static void HibThread(WindowSystemInfo wsi) {
 
         ImGui::ShowDemoWindow();
     }
+
+    g_video_backend->Shutdown();
 }
 
 int main(const int argc, char* argv[])
@@ -210,6 +212,11 @@ int main(const int argc, char* argv[])
     UICommon::CreateDirectories();
     UICommon::Init();
     UICommon::InitControllers(wsi);
+    
+    Common::ScopeGuard ui_common_guard([] {
+      UICommon::ShutdownControllers();
+      UICommon::Shutdown();
+    });
 
       Core::AddOnStateChangedCallback([](const Core::State state) {
     if (state == Core::State::Uninitialized)
@@ -240,8 +247,9 @@ int main(const int argc, char* argv[])
 
 
     s_platform->MainLoop();
+    s_hib_thread.join();
     Core::Stop(Core::System::GetInstance());
-    
+
     Core::Shutdown(Core::System::GetInstance());
     s_platform.reset();
 
