@@ -1,3 +1,4 @@
+#include "Core/HotkeyManager.h"
 #include "PlatformCommon/Platform.h"
 
 #include <OptionParser.h>
@@ -157,90 +158,147 @@ std::unique_ptr<GBAHostInterface> Host_CreateGBAHost(std::weak_ptr<HW::GBA::Core
 }
 
 static void HibThread(WindowSystemInfo wsi) {
-    Core::DeclareAsGPUThread();
-
+  Common::SetCurrentThreadName("HibUI");
+  
     if (!g_video_backend->Initialize(wsi))
     {
         PanicAlertFmt("Failed to initialize video backend!");
         return;
     }
 
-    while(s_platform->IsRunning()) {
+  while(s_platform->IsRunning()) {
+    g_presenter->PresentUI();
 
-        ImGui::Begin("Dolphin", NULL, ImGuiWindowFlags_NoTitleBar);
-        ImGui::Button("Click me!");
-        ImGui::End();
+    ImGui::Begin("Dolphin", NULL, ImGuiWindowFlags_NoTitleBar);
+    ImGui::Button("Click me!");
+    ImGui::End();
 
-        g_presenter->PresentUI();
-        Common::SleepCurrentThread(16);
-    }
+    Common::SleepCurrentThread(16);
+  }
 
     g_video_backend->Shutdown();
 }
 
 int main(const int argc, char* argv[])
 {
-    Core::DeclareAsHostThread();
+  Core::DeclareAsHostThread();
 
-    auto parser = CommandLineParse::CreateParser(CommandLineParse::ParserOptions::IncludeGUIOptions);
-    const optparse::Values& options = CommandLineParse::ParseArguments(parser.get(), argc, argv);
-    const std::vector<std::string> args = parser->args();
+  auto parser = CommandLineParse::CreateParser(CommandLineParse::ParserOptions::IncludeGUIOptions);
+  optparse::Values& options = CommandLineParse::ParseArguments(parser.get(), argc, argv);
+  std::vector<std::string> args = parser->args();
 
-    
-    #if HAVE_X11
-        s_platform = Platform::CreateX11Platform();
-    #endif
+  std::optional<std::string> save_state_path;
+  if (options.is_set("save_state"))
+  {
+    save_state_path = static_cast<const char*>(options.get("save_state"));
+  }
 
-    #ifdef __linux__
-        s_platform = Platform::CreateFBDevPlatform();
-    #endif
-
-    #ifdef _WIN32
-        s_platform = Platform::CreateWin32Platform();
-    #endif
-
-    #ifdef __APPLE__
-        s_platform = Platform::CreateMacOSPlatform();
-    #endif
-
-    if (!s_platform->Init())
+  std::unique_ptr<BootParameters> boot;
+  bool game_specified = false;
+  if (options.is_set("exec"))
+  {
+    const std::list<std::string> paths_list = options.all("exec");
+    const std::vector<std::string> paths{std::make_move_iterator(std::begin(paths_list)),
+                                        std::make_move_iterator(std::end(paths_list))};
+    boot = BootParameters::GenerateFromFile(
+        paths, BootSessionData(save_state_path, DeleteSavestateAfterBoot::No));
+    game_specified = true;
+  }
+  else if (options.is_set("nand_title"))
+  {
+    const std::string hex_string = static_cast<const char*>(options.get("nand_title"));
+    if (hex_string.length() != 16)
     {
-        fprintf(stderr, "Platform failed to initialize.\n");
-        return 1;
+      fprintf(stderr, "Invalid title ID\n");
+      parser->print_help();
+      return 1;
     }
+    const u64 title_id = std::stoull(hex_string, nullptr, 16);
+    boot = std::make_unique<BootParameters>(BootParameters::NANDTitle{title_id});
+  }
+  else if (args.size())
+  {
+    boot = BootParameters::GenerateFromFile(
+        args.front(), BootSessionData(save_state_path, DeleteSavestateAfterBoot::No));
+    args.erase(args.begin());
+    game_specified = true;
+  }
 
-    s_platform->SetTitle("Dolphin Custom");
+  std::string user_directory;
+  if (options.is_set("user"))
+    user_directory = static_cast<const char*>(options.get("user"));
 
-    const WindowSystemInfo wsi = s_platform->GetWindowSystemInfo();
+  
+  #if HAVE_X11
+      s_platform = Platform::CreateX11Platform();
+  #endif
 
-    UICommon::SetUserDirectory(static_cast<const char*>(options.get("user")));
-    UICommon::CreateDirectories();
-    UICommon::Init();
-    UICommon::InitControllers(wsi);
-    
-    Common::ScopeGuard ui_common_guard([] {
-      UICommon::ShutdownControllers();
-      UICommon::Shutdown();
-    });
+  #ifdef __linux__
+      s_platform = Platform::CreateFBDevPlatform();
+  #endif
 
-      Core::AddOnStateChangedCallback([](const Core::State state) {
-    if (state == Core::State::Uninitialized)
-      s_platform->Stop();
+  #ifdef _WIN32
+      s_platform = Platform::CreateWin32Platform();
+  #endif
+
+  #ifdef __APPLE__
+      s_platform = Platform::CreateMacOSPlatform();
+  #endif
+
+  if (!s_platform->Init())
+  {
+      fprintf(stderr, "Platform failed to initialize.\n");
+      return 1;
+  }
+
+  s_platform->SetTitle("Dolphin Custom");
+
+  const WindowSystemInfo wsi = s_platform->GetWindowSystemInfo();
+
+  UICommon::SetUserDirectory(user_directory);
+  UICommon::CreateDirectories();
+  UICommon::Init();
+  UICommon::InitControllers(wsi);
+  
+  Common::ScopeGuard ui_common_guard([] {
+    UICommon::ShutdownControllers();
+    UICommon::Shutdown();
   });
 
-    #ifdef _WIN32
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
-    #else
-    // Shut down cleanly on SIGINT and SIGTERM
-    struct sigaction sa;
-    sa.sa_handler = signal_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESETHAND;
-    sigaction(SIGINT, &sa, nullptr);
-    sigaction(SIGTERM, &sa, nullptr);
-    #endif
+  if (save_state_path && !game_specified)
+  {
+    fprintf(stderr, "A save state cannot be loaded without specifying a game to launch.\n");
+    return 1;
+  }
 
+  Core::AddOnStateChangedCallback([](const Core::State state) {
+  if (state == Core::State::Uninitialized)
+    s_platform->Stop();
+  });
+
+  #ifdef _WIN32
+  std::signal(SIGINT, signal_handler);
+  std::signal(SIGTERM, signal_handler);
+  #else
+  // Shut down cleanly on SIGINT and SIGTERM
+  struct sigaction sa;
+  sa.sa_handler = signal_handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_RESETHAND;
+  sigaction(SIGINT, &sa, nullptr);
+  sigaction(SIGTERM, &sa, nullptr);
+  #endif
+
+  if(game_specified)
+  {
+    if (!BootManager::BootCore(Core::System::GetInstance(), std::move(boot), wsi))
+    {
+      fprintf(stderr, "Could not boot the specified file\n");
+      return 1;
+    }
+  }
+  else 
+  {
     // Manually reactivate the video backend in case a GameINI overrides the video backend setting.
     VideoBackendBase::PopulateBackendInfo(wsi);
 
@@ -249,14 +307,18 @@ int main(const int argc, char* argv[])
     g_video_backend->PrepareWindow(prepared_wsi);
 
     s_hib_thread = std::thread(HibThread, prepared_wsi);
+  }
 
+  s_platform->MainLoop();
+  Core::Stop(Core::System::GetInstance());
 
-    s_platform->MainLoop();
+  Core::Shutdown(Core::System::GetInstance());
+
+  // Kill Our UI Thread for if dolphin is ran without a game
+  if(!game_specified)
     s_hib_thread.join();
-    Core::Stop(Core::System::GetInstance());
 
-    Core::Shutdown(Core::System::GetInstance());
-    s_platform.reset();
+  s_platform.reset();
 
-    return 0;
+  return 0;
 }
