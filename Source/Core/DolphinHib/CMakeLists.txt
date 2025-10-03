@@ -1,5 +1,7 @@
 add_executable(dolphin-Hib
   MainHib.cpp
+  GameList.cpp
+  GameList.h
 )
 
 set_target_properties(dolphin-Hib PROPERTIES OUTPUT_NAME dolphin-emu-hib)
@@ -11,6 +13,7 @@ PRIVATE
   imgui
   uicommon
   cpp-optparse
+  nfd
 )
 
 if(WIN32)

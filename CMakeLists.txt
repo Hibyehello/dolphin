@@ -650,6 +650,10 @@ dolphin_find_optional_system_library_pkgconfig(FMT
   fmt>=10.1 fmt::fmt Externals/fmt
 )
 
+if (ENABLE_CUSTOM)
+  add_subdirectory(Externals/nativefiledialog)
+endif()
+
 add_subdirectory(Externals/imgui)
 add_subdirectory(Externals/implot)
 dolphin_find_optional_system_library(glslang Externals/glslang 15.0)

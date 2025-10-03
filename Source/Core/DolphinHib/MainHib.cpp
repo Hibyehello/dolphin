@@ -1,5 +1,6 @@
 #include "Core/HotkeyManager.h"
 #include "PlatformCommon/Platform.h"
+#include <nfd.h>
 
 #include <OptionParser.h>
 #include <csignal>
@@ -13,6 +14,8 @@
 #else
 #include <Windows.h>
 #endif
+
+#include "GameList.h"
 
 #include "Common/ScopeGuard.h"
 #include "Common/StringUtil.h"
@@ -170,7 +173,9 @@ static void HibThread(WindowSystemInfo wsi) {
     g_presenter->PresentUI();
 
     ImGui::Begin("Dolphin", NULL, ImGuiWindowFlags_NoTitleBar);
-    ImGui::Button("Click me!");
+    if(ImGui::Button("Click me!")) {
+        HibUI::GameList::SetIsoPath();
+      }
     ImGui::End();
 
     Common::SleepCurrentThread(16);
@@ -259,6 +264,7 @@ int main(const int argc, char* argv[])
   UICommon::CreateDirectories();
   UICommon::Init();
   UICommon::InitControllers(wsi);
+  NFD_Init();
   
   Common::ScopeGuard ui_common_guard([] {
     UICommon::ShutdownControllers();
@@ -317,6 +323,8 @@ int main(const int argc, char* argv[])
   // Kill Our UI Thread for if dolphin is ran without a game
   if(!game_specified)
     s_hib_thread.join();
+
+  NFD_Quit();
 
   s_platform.reset();
 
