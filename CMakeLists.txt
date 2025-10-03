@@ -137,6 +137,8 @@ else()
 endif()
 
 if(APPLE)
+  enable_language(OBJC)
+  enable_language(OBJCXX)
   option(MACOS_USE_DEFAULT_SEARCH_PATH "Don't prioritize system library paths" OFF)
   option(SKIP_POSTPROCESS_BUNDLE "Skip postprocessing bundle for redistributability" OFF)
   # Enable adhoc code signing by default (otherwise makefile builds on ARM will not work)
@@ -602,7 +604,7 @@ if(UNIX)
 endif()
 
 if(ENABLE_SDL)
-  dolphin_find_optional_system_library(SDL2 Externals/SDL 2.30.9)
+  dolphin_find_optional_system_library(SDL3 Externals/SDL 3.2.0)
 endif()
 
 if(ENABLE_ANALYTICS)
@@ -651,7 +653,7 @@ add_subdirectory(Externals/imgui)
 add_subdirectory(Externals/nativefiledialog-extended)
 include_directories(Externals/nativefiledialog-extended/src/include)
 add_subdirectory(Externals/implot)
-add_subdirectory(Externals/glslang)
+dolphin_find_optional_system_library(glslang Externals/glslang 15.0)
 # SPIRV-Cross is used on Windows for GLSL to HLSL conversion for the Direct3D 11 and Direct3D 12
 # video backends, and on Apple devices for the Metal video backend.
 if(WIN32 OR APPLE)
@@ -693,8 +695,8 @@ dolphin_find_optional_system_library_pkgconfig(ZSTD libzstd>=1.4.0 zstd::zstd Ex
 
 dolphin_find_optional_system_library_pkgconfig(ZLIB zlib>=1.3.1 ZLIB::ZLIB Externals/zlib-ng)
 
-dolphin_find_optional_system_library_pkgconfig(MINIZIP
-  "minizip>=4.0.4" minizip::minizip Externals/minizip-ng
+dolphin_find_optional_system_library_pkgconfig(minizip-ng
+  "minizip-ng>=4.0.4" minizip-ng::minizip-ng Externals/minizip-ng
 )
 
 dolphin_find_optional_system_library(LZO Externals/LZO)
@@ -785,6 +787,8 @@ add_subdirectory(Externals/FatFs)
 if (USE_RETRO_ACHIEVEMENTS)
 	add_subdirectory(Externals/rcheevos)
 endif()
+
+add_subdirectory(Externals/watcher)
 
 ########################################
 # Pre-build events: Define configuration variables and write SCM info header

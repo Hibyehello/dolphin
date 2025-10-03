@@ -104,15 +104,11 @@ u64 GetUnixTimeOfSlot(int slot);
 void Save(Core::System& system, int slot, bool wait=false, bool emit_event=true);
 void Load(Core::System& system, int slot, bool emit_event=true);
 
-void SaveAs(Core::System& system, const std::string& filename, bool wait, bool is_slot, int slot, bool emit_event);
+void SaveAs(Core::System& system, const std::string& filename, bool wait = false, bool is_slot, int slot, bool emit_event);
 void LoadAs(Core::System& system, const std::string& filename, bool is_slot, int slot, bool emit_event);
-void SaveFile(Core::System& system, const std::string& filename, bool wait, bool emit_event);
-void LoadFile(Core::System& system, const std::string& filename, bool emit_event);
 
 void SaveToBuffer(Core::System& system, Common::UniqueBuffer<u8>& buffer, bool emit_event);
-void LoadFromBuffer(Core::System& system, const Common::UniqueBuffer<u8>& buffer, bool emit_event);
-void SaveToBufferLegacy(Core::System& system, std::vector<u8>& buffer, bool emit_event);
-void LoadFromBufferLegacy(Core::System& system, std::vector<u8>& buffer, bool emit_event);
+void LoadFromBuffer(Core::System& system, Common::UniqueBuffer<u8>& buffer, bool emit_event);
 
 void LoadLastSaved(Core::System& system, int i = 1);
 void SaveFirstSaved(Core::System& system);

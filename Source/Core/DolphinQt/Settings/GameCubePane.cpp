@@ -39,7 +39,6 @@
 #include "DolphinQt/QtUtils/DolphinFileDialog.h"
 #include "DolphinQt/QtUtils/ModalMessageBox.h"
 #include "DolphinQt/QtUtils/NonDefaultQPushButton.h"
-#include "DolphinQt/QtUtils/SetWindowDecorations.h"
 #include "DolphinQt/QtUtils/SignalBlocking.h"
 #include "DolphinQt/Settings.h"
 #include "DolphinQt/Settings/BroadbandAdapterSettingsDialog.h"
@@ -242,7 +241,11 @@ void GameCubePane::CreateWidgets()
 void GameCubePane::ConnectWidgets()
 {
   // IPL Settings
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+  connect(m_skip_main_menu, &QCheckBox::checkStateChanged, this, &GameCubePane::SaveSettings);
+#else
   connect(m_skip_main_menu, &QCheckBox::stateChanged, this, &GameCubePane::SaveSettings);
+#endif
   connect(m_language_combo, &QComboBox::currentIndexChanged, this, &GameCubePane::SaveSettings);
 
   // Device Settings
@@ -273,10 +276,20 @@ void GameCubePane::ConnectWidgets()
 
 #ifdef HAS_LIBMGBA
   // GBA Settings
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+  connect(m_gba_threads, &QCheckBox::checkStateChanged, this, &GameCubePane::SaveSettings);
+#else
   connect(m_gba_threads, &QCheckBox::stateChanged, this, &GameCubePane::SaveSettings);
+#endif
   connect(m_gba_bios_edit, &QLineEdit::editingFinished, this, &GameCubePane::SaveSettings);
   connect(m_gba_browse_bios, &QPushButton::clicked, this, &GameCubePane::BrowseGBABios);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+  connect(m_gba_save_rom_path, &QCheckBox::checkStateChanged, this,
+          &GameCubePane::SaveRomPathChanged);
+#else
   connect(m_gba_save_rom_path, &QCheckBox::stateChanged, this, &GameCubePane::SaveRomPathChanged);
+#endif
   connect(m_gba_saves_edit, &QLineEdit::editingFinished, this, &GameCubePane::SaveSettings);
   connect(m_gba_browse_saves, &QPushButton::clicked, this, &GameCubePane::BrowseGBASaves);
   for (size_t i = 0; i < m_gba_browse_roms.size(); ++i)
@@ -381,28 +394,24 @@ void GameCubePane::OnConfigPressed(ExpansionInterface::Slot slot)
   {
     // TODO: convert MappingWindow to use Slot?
     MappingWindow dialog(this, MappingWindow::Type::MAPPING_GC_MICROPHONE, static_cast<int>(slot));
-    SetQWidgetWindowDecorations(&dialog);
     dialog.exec();
     return;
   }
   case ExpansionInterface::EXIDeviceType::Ethernet:
   {
     BroadbandAdapterSettingsDialog dialog(this, BroadbandAdapterSettingsDialog::Type::Ethernet);
-    SetQWidgetWindowDecorations(&dialog);
     dialog.exec();
     return;
   }
   case ExpansionInterface::EXIDeviceType::EthernetXLink:
   {
     BroadbandAdapterSettingsDialog dialog(this, BroadbandAdapterSettingsDialog::Type::XLinkKai);
-    SetQWidgetWindowDecorations(&dialog);
     dialog.exec();
     return;
   }
   case ExpansionInterface::EXIDeviceType::EthernetTapServer:
   {
     BroadbandAdapterSettingsDialog dialog(this, BroadbandAdapterSettingsDialog::Type::TapServer);
-    SetQWidgetWindowDecorations(&dialog);
     dialog.exec();
     return;
   }
@@ -410,14 +419,12 @@ void GameCubePane::OnConfigPressed(ExpansionInterface::Slot slot)
   {
     BroadbandAdapterSettingsDialog dialog(this,
                                           BroadbandAdapterSettingsDialog::Type::ModemTapServer);
-    SetQWidgetWindowDecorations(&dialog);
     dialog.exec();
     return;
   }
   case ExpansionInterface::EXIDeviceType::EthernetBuiltIn:
   {
     BroadbandAdapterSettingsDialog dialog(this, BroadbandAdapterSettingsDialog::Type::BuiltIn);
-    SetQWidgetWindowDecorations(&dialog);
     dialog.exec();
     return;
   }
@@ -733,7 +740,7 @@ void GameCubePane::LoadSettings()
     }
   }
 
-  m_skip_main_menu->setEnabled(have_menu);
+  m_skip_main_menu->setEnabled(have_menu || !m_skip_main_menu->isChecked());
   m_skip_main_menu->setToolTip(have_menu ? QString{} : tr("Put IPL ROMs in User/GC/<region>."));
 
   // Device Settings

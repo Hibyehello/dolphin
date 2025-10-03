@@ -19,6 +19,7 @@
 #include "VideoCommon/AbstractGfx.h"
 #include "VideoCommon/AbstractPipeline.h"
 #include "VideoCommon/AbstractShader.h"
+#include "VideoCommon/AbstractStagingTexture.h"
 #include "VideoCommon/FramebufferShaderGen.h"
 #include "VideoCommon/NetPlayChatUI.h"
 #include "VideoCommon/NetPlayGolfUI.h"
@@ -74,6 +75,13 @@ bool OnScreenUI::Initialize(u32 width, u32 height, float scale)
     return false;
   }
 
+  // Font defaults
+  m_imgui_textures.clear();
+
+  // Setup new font management behavior.
+  ImGui::GetIO().BackendFlags |=
+      ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset;
+
   // Font texture(s).
   {
     ImGuiIO& io = ImGui::GetIO();
@@ -127,6 +135,7 @@ OnScreenUI::~OnScreenUI()
   ImGui::EndFrame();
   ImPlot::DestroyContext();
   ImGui::DestroyContext();
+  m_imgui_textures.clear();
 }
 
 bool OnScreenUI::RecompileImGuiPipeline()
@@ -175,11 +184,11 @@ bool OnScreenUI::RecompileImGuiPipeline()
   pconfig.rasterization_state = RenderState::GetNoCullRasterizationState(PrimitiveType::Triangles);
   pconfig.depth_state = RenderState::GetNoDepthTestingDepthState();
   pconfig.blending_state = RenderState::GetNoBlendingBlendState();
-  pconfig.blending_state.blendenable = true;
-  pconfig.blending_state.srcfactor = SrcBlendFactor::SrcAlpha;
-  pconfig.blending_state.dstfactor = DstBlendFactor::InvSrcAlpha;
-  pconfig.blending_state.srcfactoralpha = SrcBlendFactor::Zero;
-  pconfig.blending_state.dstfactoralpha = DstBlendFactor::One;
+  pconfig.blending_state.blend_enable = true;
+  pconfig.blending_state.src_factor = SrcBlendFactor::SrcAlpha;
+  pconfig.blending_state.dst_factor = DstBlendFactor::InvSrcAlpha;
+  pconfig.blending_state.src_factor_alpha = SrcBlendFactor::Zero;
+  pconfig.blending_state.dst_factor_alpha = DstBlendFactor::One;
   pconfig.framebuffer_state.color_texture_format = g_presenter->GetBackbufferFormat();
   pconfig.framebuffer_state.depth_texture_format = AbstractTextureFormat::Undefined;
   pconfig.framebuffer_state.samples = 1;
@@ -266,7 +275,7 @@ void OnScreenUI::DrawImGui()
               static_cast<int>(cmd.ClipRect.x), static_cast<int>(cmd.ClipRect.y),
               static_cast<int>(cmd.ClipRect.z), static_cast<int>(cmd.ClipRect.w)),
           g_gfx->GetCurrentFramebuffer()));
-      g_gfx->SetTexture(0, reinterpret_cast<const AbstractTexture*>(cmd.TextureId));
+      g_gfx->SetTexture(0, reinterpret_cast<const AbstractTexture*>(cmd.GetTexID()));
       g_gfx->DrawIndexed(base_index, cmd.ElemCount, base_vertex + cmd.VtxOffset);
       base_index += cmd.ElemCount;
     }
@@ -293,11 +302,12 @@ void OnScreenUI::DrawDebugText()
   {
     // Position under the FPS display.
     ImGui::SetNextWindowPos(
-        ImVec2(ImGui::GetIO().DisplaySize.x - 10.f * m_backbuffer_scale, 80.f * m_backbuffer_scale),
+        ImVec2(ImGui::GetIO().DisplaySize.x - ImGui::GetFontSize() * m_backbuffer_scale,
+               80.f * m_backbuffer_scale),
         ImGuiCond_FirstUseEver, ImVec2(1.0f, 0.0f));
-    ImGui::SetNextWindowSizeConstraints(
-        ImVec2(150.0f * m_backbuffer_scale, 20.0f * m_backbuffer_scale),
-        ImGui::GetIO().DisplaySize);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(5.0f * ImGui::GetFontSize() * m_backbuffer_scale,
+                                               2.1f * ImGui::GetFontSize() * m_backbuffer_scale),
+                                        ImGui::GetIO().DisplaySize);
     if (ImGui::Begin("Movie", nullptr, ImGuiWindowFlags_NoFocusOnAppearing))
     {
       auto& movie = Core::System::GetInstance().GetMovie();
@@ -425,6 +435,104 @@ void OnScreenUI::Finalize()
   OSD::DrawMessages();
   DrawChallengesAndLeaderboards();
   ImGui::Render();
+
+  // Check for font changes
+  ImGuiStyle& style = ImGui::GetStyle();
+  const int size = Config::Get(Config::MAIN_OSD_FONT_SIZE);
+  if (size != style.FontSizeBase)
+    style.FontSizeBase = static_cast<float>(size);
+
+  // Create or update fonts.
+  ImDrawData* draw_data = ImGui::GetDrawData();
+  if (draw_data->Textures != nullptr)
+    for (ImTextureData* tex : *draw_data->Textures)
+      if (tex->Status != ImTextureStatus_OK)
+        UpdateImguiTexture(tex);
+}
+
+void OnScreenUI::UpdateImguiTexture(ImTextureData* tex)
+{
+  if (tex->Status == ImTextureStatus_WantCreate)
+  {
+    // Create new font texture.
+    IM_ASSERT(tex->TexID == ImTextureID_Invalid);
+    IM_ASSERT(tex->Format == ImTextureFormat_RGBA32);
+
+    TextureConfig font_tex_config(tex->Width, tex->Height, 1, 1, 1, AbstractTextureFormat::RGBA8, 0,
+                                  AbstractTextureType::Texture_2DArray);
+    std::unique_ptr<AbstractTexture> font_tex =
+        g_gfx->CreateTexture(font_tex_config, "ImGui font texture");
+
+    if (!font_tex)
+    {
+      PanicAlertFmt("Failed to create ImGui texture");
+      return;
+    }
+
+    font_tex->Load(0, tex->Width, tex->Height, tex->Width, tex->Pixels,
+                   sizeof(u32) * tex->Width * tex->Height);
+
+    tex->SetTexID(static_cast<ImTextureID>(*font_tex.get()));
+    // Keeps the texture alive.
+    m_imgui_textures.push_back(std::move(font_tex));
+
+    tex->SetStatus(ImTextureStatus_OK);
+  }
+  else if (tex->Status == ImTextureStatus_WantUpdates)
+  {
+    AbstractTexture* font_tex = reinterpret_cast<AbstractTexture*>(tex->GetTexID());
+
+    if (!font_tex || tex->TexID == ImTextureID_Invalid)
+    {
+      PanicAlertFmt("ImGui texture not created before update");
+      return;
+    }
+
+    for (const ImTextureRect& r : tex->Updates)
+    {
+      // Rect of texture that will be updated.
+      const int x_offset = static_cast<int>(r.x);
+      const int y_offset = static_cast<int>(r.y);
+      const int width = static_cast<int>(r.w);
+      const int height = static_cast<int>(r.h);
+
+      // Create a staging texture to update the font texture with.
+      TextureConfig font_tex_config(width, height, 1, 1, 1, AbstractTextureFormat::RGBA8, 0,
+                                    AbstractTextureType::Texture_2DArray);
+      std::unique_ptr<AbstractStagingTexture> stage =
+          g_gfx->CreateStagingTexture(StagingTextureType::Upload, font_tex_config);
+
+      const int src_pitch = width * tex->BytesPerPixel;
+
+      // Write to staging texture.
+      for (int y = 0; y < height; y++)
+      {
+        const MathUtil::Rectangle<int> rect_line = {0, y, width, y + 1};
+        stage->WriteTexels(rect_line, tex->GetPixelsAt(x_offset, y_offset + y), src_pitch);
+      }
+
+      // Copy to font texture.
+      const MathUtil::Rectangle<int> rect_staging = {0, 0, width, height};
+      const MathUtil::Rectangle<int> rect_target = {x_offset, y_offset, width + x_offset,
+                                                    height + y_offset};
+
+      stage->CopyToTexture(rect_staging, font_tex, rect_target, 0, 0);
+    }
+
+    tex->SetStatus(ImTextureStatus_OK);
+  }
+  else if (tex->Status == ImTextureStatus_WantDestroy && tex->UnusedFrames > 0)
+  {
+    AbstractTexture* font_tex = reinterpret_cast<AbstractTexture*>(tex->GetTexID());
+
+    tex->SetTexID(ImTextureID_Invalid);
+
+    m_imgui_textures.erase(
+        std::find_if(m_imgui_textures.begin(), m_imgui_textures.end(),
+                     [font_tex](auto& element) { return element.get() == font_tex; }));
+
+    tex->Status = ImTextureStatus_Destroyed;
+  }
 }
 
 std::unique_lock<std::mutex> OnScreenUI::GetImGuiLock()
@@ -436,12 +544,14 @@ void OnScreenUI::SetScale(float backbuffer_scale)
 {
   ImGui::GetIO().DisplayFramebufferScale.x = backbuffer_scale;
   ImGui::GetIO().DisplayFramebufferScale.y = backbuffer_scale;
-  ImGui::GetIO().FontGlobalScale = backbuffer_scale;
+
   // ScaleAllSizes scales in-place, so calling it twice will double-apply the scale
   // Reset the style first so that the scale is applied to the base style, not an already-scaled one
-  ImGui::GetStyle() = {};
-  ImGui::GetStyle().WindowRounding = 7.0f;
-  ImGui::GetStyle().ScaleAllSizes(backbuffer_scale);
+  ImGuiStyle& style = ImGui::GetStyle();
+  style = {};
+  style.FontScaleMain = backbuffer_scale;
+  style.WindowRounding = 7.0f;
+  style.ScaleAllSizes(backbuffer_scale);
 
   m_backbuffer_scale = backbuffer_scale;
 }
