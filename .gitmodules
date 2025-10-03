@@ -62,10 +62,6 @@
 	path = Externals/fmt/fmt
 	url = https://github.com/fmtlib/fmt.git
 	shallow = true
-[submodule "Externals/python"]
-	path = Externals/python
-	url = https://github.com/Felk/ext-python.git
-	shallow = true
 [submodule "Externals/lz4/lz4"]
 	path = Externals/lz4/lz4
 	url = https://github.com/lz4/lz4.git
@@ -114,3 +110,6 @@
 	path = Externals/glslang/glslang
 	url = https://github.com/KhronosGroup/glslang.git
 	shallow = true
+[submodule "python"]
+	path = Externals/python
+	url = https://github.com/Felk/ext-python.git
