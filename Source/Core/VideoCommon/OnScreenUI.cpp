@@ -79,6 +79,8 @@ bool OnScreenUI::Initialize(u32 width, u32 height, float scale)
   ImGui::GetIO().BackendFlags |=
       ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset;
 
+  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
   if (!RecompileImGuiPipeline())
     return false;
 
