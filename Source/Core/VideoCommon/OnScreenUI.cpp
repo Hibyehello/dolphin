@@ -75,12 +75,12 @@ bool OnScreenUI::Initialize(u32 width, u32 height, float scale)
     return false;
   }
 
-  // Font defaults
-  m_imgui_textures.clear();
+  // // Font defaults
+  // m_imgui_textures.clear();
 
-  // Setup new font management behavior.
-  ImGui::GetIO().BackendFlags |=
-      ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset;
+  // // Setup new font management behavior.
+  // ImGui::GetIO().BackendFlags |=
+  //     ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset;
 
   // Font texture(s).
   {
