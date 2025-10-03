@@ -3,6 +3,7 @@
 
 #include "VideoCommon/OnScreenUI.h"
 
+#include "Common/CommonPaths.h"
 #include "Common/EnumMap.h"
 #include "Common/FileUtil.h"
 #include "Common/Profiler.h"
@@ -483,7 +484,6 @@ void OnScreenUI::UpdateImguiTexture(ImTextureData* tex)
     tex->SetTexID(static_cast<ImTextureID>(*font_tex.get()));
     // Keeps the texture alive.
     m_imgui_textures.push_back(std::move(font_tex));
-
     tex->SetStatus(ImTextureStatus_OK);
   }
   else if (tex->Status == ImTextureStatus_WantUpdates)
