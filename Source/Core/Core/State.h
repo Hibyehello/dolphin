@@ -100,8 +100,9 @@ u64 GetUnixTimeOfSlot(int slot);
 //    If we're in the main CPU thread then they run immediately instead
 //    because some things (like Lua) need them to run immediately.
 // Slots from 0-99.
-void Save(Core::System& system, int slot, bool wait, bool emit_event);
-void Load(Core::System& system, int slot, bool emit_event);
+// Not sure what the default should be for wait and emit_event so just trying this
+void Save(Core::System& system, int slot, bool wait=false, bool emit_event=true);
+void Load(Core::System& system, int slot, bool emit_event=true);
 
 void SaveAs(Core::System& system, const std::string& filename, bool wait, bool is_slot, int slot, bool emit_event);
 void LoadAs(Core::System& system, const std::string& filename, bool is_slot, int slot, bool emit_event);
