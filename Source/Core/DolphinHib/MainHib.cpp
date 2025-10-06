@@ -1,5 +1,6 @@
 #include "Core/HotkeyManager.h"
 #include "PlatformCommon/Platform.h"
+#include "imgui_internal.h"
 #include <nfd.h>
 
 #include <OptionParser.h>
@@ -163,20 +164,60 @@ std::unique_ptr<GBAHostInterface> Host_CreateGBAHost(std::weak_ptr<HW::GBA::Core
 static void HibThread(WindowSystemInfo wsi) {
   Common::SetCurrentThreadName("HibUI");
   
-    if (!g_video_backend->Initialize(wsi))
-    {
-        PanicAlertFmt("Failed to initialize video backend!");
-        return;
-    }
+  if (!g_video_backend->Initialize(wsi))
+  {
+      PanicAlertFmt("Failed to initialize video backend!");
+      return;
+  }
+
+  HibUI::GameList game_list;
 
   while(s_platform->IsRunning()) {
     g_presenter->PresentUI();
 
-    ImGui::Begin("Dolphin", NULL, ImGuiWindowFlags_NoTitleBar);
-    if(ImGui::Button("Click me!")) {
-        HibUI::GameList::SetIsoPath();
-      }
+    ImGuiIO io = ImGui::GetIO();
+
+    static ImGuiWindowFlags main_window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+    main_window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+    main_window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+    static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
+
+    ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+
+    ImGui::SetNextWindowPos(main_viewport->Pos);
+    ImGui::SetNextWindowSize(main_viewport->Size);
+    ImGui::SetNextWindowViewport(main_viewport->ID);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+    if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode) {
+        main_window_flags |= ImGuiWindowFlags_NoBackground;
+    }
+
+    ImGui::Begin("DockSpace", nullptr, main_window_flags);
+    ImGui::PopStyleVar(3);
+
+    ImGuiID dockspace_id = ImGui::GetID("DockSpace");
+
+    ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+
+    static bool first_time = true;
+    if (first_time) {
+        first_time = false;
+        ImGui::DockBuilderRemoveNode(dockspace_id);
+        ImGui::DockBuilderAddNode(dockspace_id, dockspace_flags | ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspace_id, main_viewport->Size);
+
+        auto dock_id_left = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.25f, nullptr, &dockspace_id);
+        ImGui::DockBuilderDockWindow("Games", dock_id_left);
+
+        ImGui::DockBuilderFinish(dockspace_id);
+    }
     ImGui::End();
+
+    game_list.ShowGameListWidget();
 
     Common::SleepCurrentThread(16);
   }

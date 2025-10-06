@@ -79,7 +79,9 @@ bool OnScreenUI::Initialize(u32 width, u32 height, float scale)
   ImGui::GetIO().BackendFlags |=
       ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset;
 
-  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+
+  ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
 
   if (!RecompileImGuiPipeline())
     return false;
@@ -397,6 +399,13 @@ void OnScreenUI::Finalize()
   OSD::DrawMessages();
   DrawChallengesAndLeaderboards();
   ImGui::Render();
+
+  if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+  {
+      ImGui::UpdatePlatformWindows();
+      ImGui::RenderPlatformWindowsDefault();
+      // TODO for OpenGL: restore current GL context.
+  }
 
   // Check for font changes
   ImGuiStyle& style = ImGui::GetStyle();
