@@ -66,6 +66,8 @@ private:
   void DrawChallengesAndLeaderboards();
   void UpdateImguiTexture(ImTextureData* tex);
 
+  void InitMultiViewportSupport();
+
   // ImGui resources.
   std::unique_ptr<NativeVertexFormat> m_imgui_vertex_format;
   std::vector<std::unique_ptr<AbstractTexture>> m_imgui_textures;

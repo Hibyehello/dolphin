@@ -226,6 +226,7 @@ PRIVATE
   implot
   glslang::glslang
   tinygltf
+  platformcommon
 )
 
 if(_M_X86_64)

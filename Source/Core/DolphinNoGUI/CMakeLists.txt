@@ -6,6 +6,7 @@ target_link_libraries(dolphin-nogui
 PRIVATE
   platformcommon
   core
+  imgui
   uicommon
   cpp-optparse
 )

@@ -25,6 +25,7 @@ endif()
 target_link_libraries(platformcommon
 PRIVATE
   core
+  imgui
   uicommon
   cpp-optparse
 )

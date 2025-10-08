@@ -1,7 +1,8 @@
 #include "GameList.h"
-#include "Core/TitleDatabase.h"
-#include "UICommon/GameFile.h"
-#include "imgui_internal.h"
+
+#include "Common/WindowSystemInfo.h"
+#include "Core/HotkeyManager.h"
+#include "VideoCommon/VideoBackendBase.h"
 #include "nfd.h"
 #include <cstddef>
 #include <cstdio>
@@ -12,8 +13,14 @@
 #include <type_traits>
 #include <vector>
 
+#include "Core/Boot/Boot.h"
 #include "Core/Config/MainSettings.h"
+#include "Core/BootManager.h"
+#include "Core/System.h"
+#include "Core/TitleDatabase.h"
 #include "Common/Contains.h"
+#include "PlatformCommon/Platform.h"
+#include "UICommon/GameFile.h"
 
 namespace HibUI
 {
@@ -69,6 +76,15 @@ void GameList::ShowGameListWidget()
     }
 
   ImGui::End();
+
+  if(ready_to_launch)
+  {
+    fprintf(stderr, "Should boot: %s\n", game_to_launch.c_str());
+    
+    return;
+  }
+
+  return;
 }
 
 void GameList::SetIsoPath()
@@ -98,7 +114,8 @@ void GameList::GameItem(const std::shared_ptr<const UICommon::GameFile>& game)
   ImGui::PushID(game->GetFileName().c_str());
   if(ImGui::Button(text, {ImGui::GetItemRectMax().x, 20}))
   {
-    fprintf(stderr, "Should boot: %s\n", game->GetFilePath().c_str());
+    ready_to_launch = true;
+    game_to_launch = game->GetFilePath();
   }
   ImGui::PopID();
   ImGui::PopStyleVar();

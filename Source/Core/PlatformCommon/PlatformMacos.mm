@@ -1,6 +1,7 @@
 // Copyright 2023 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "Common/GL/GLInterface/AGL.h"
 #include "PlatformCommon/Platform.h"
 
 #include "Common/MsgHandler.h"
@@ -10,6 +11,7 @@
 #include "Core/System.h"
 #include "VideoCommon/EFBInterface.h"
 #include "VideoCommon/Present.h"
+#include "imgui.h"
 
 #include <AppKit/AppKit.h>
 #include <Carbon/Carbon.h>
@@ -20,6 +22,8 @@
 #include <cstdio>
 #include <cstring>
 #include <thread>
+
+struct ImGui_MacOS_Data;
 
 @interface Application : NSApplication
 @property Platform* platform;
@@ -121,7 +125,7 @@
 
 namespace
 {
-class PlatformMacOS : public Platform
+class PlatformMacOS final : public Platform
 {
 public:
   ~PlatformMacOS() override;
@@ -131,6 +135,19 @@ public:
   void MainLoop() override;
 
   WindowSystemInfo GetWindowSystemInfo() const override;
+
+// Imgui Platform Functions
+  bool ImGuiPlatformInit(void* view = nullptr) override;
+  void InitMonitors(ImGuiPlatformIO& platform_io) override;
+  void RegisterMainViewport() override;
+  void CreateWindow(ImGuiViewport *vp) override;
+  void DestroyWindow(ImGuiViewport* vp) override;
+  ImVec2 GetWindowPos(ImGuiViewport* vp) override;
+  void SetWindowPos(ImGuiViewport* vp, ImVec2 size) override;
+  ImVec2 GetWindowSize(ImGuiViewport* vp) override;
+  void SetWindowSize(ImGuiViewport* vp, ImVec2 size) override;
+  void SetImGuiWindowTitle(ImGuiViewport* vp, const char* str) override;
+  void ShowWindow(ImGuiViewport* vp) override;
 
 private:
   void ProcessEvents();
@@ -298,6 +315,7 @@ bool PlatformMacOS::PassEventToPresenter(NSEvent* event)
     };
 
     g_presenter->SetKeyMap(key_map);
+    m_key_map_set = true;
   }
 
   int width = [[NSScreen mainScreen] frame].size.width;
@@ -486,6 +504,191 @@ void PlatformMacOS::SetupMenu()
 
     [NSApp setMainMenu:menuBar];
   }
+}
+
+
+// Imgui Platform Impl
+struct ImGui_MacOS_Data
+{
+    CFTimeInterval              Time;
+    NSCursor*                   MouseCursors[ImGuiMouseCursor_COUNT];
+    bool                        MouseCursorHidden;
+    NSTextInputContext*         InputContext;
+    id                          Monitor;
+    NSWindow*                   Window;
+
+    ImGui_MacOS_Data()        { memset((void*)this, 0, sizeof(*this)); }
+};
+
+struct ImGui_MacOS_ViewportData
+{
+    NSWindow*        Window;
+    bool             WindowOwned;
+
+    ImGui_MacOS_ViewportData()  { WindowOwned = false; }
+    ~ImGui_MacOS_ViewportData() { IM_ASSERT(Window == nil); }
+};
+
+// from ImGui/backends/imgui_impl_osx.mm
+static void ConvertNSRect(NSRect* r)
+{
+    NSRect firstScreenFrame = NSScreen.screens[0].frame;
+    IM_ASSERT(firstScreenFrame.origin.x == 0 && firstScreenFrame.origin.y == 0);
+    r->origin.y = firstScreenFrame.size.height - r->origin.y - r->size.height;
+}
+
+bool PlatformMacOS::ImGuiPlatformInit(void* view) 
+{
+  ImGuiIO& io = ImGui::GetIO();
+  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+
+  IM_ASSERT(io.BackendPlatformUserData == nullptr && "Already initialized a platform backend!");
+
+  ImGui_MacOS_Data* bd = IM_NEW(ImGui_MacOS_Data)();
+  io.BackendPlatformUserData = (void*)bd;
+  io.BackendPlatformName = "Dolphin_MacOS";
+  io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
+  io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;
+
+  bd->Window = ((__bridge NSView*)view).window ?: NSApp.orderedWindows.firstObject;
+  ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+  main_viewport->PlatformHandle = main_viewport->PlatformHandleRaw = (__bridge_retained void*)bd->Window;
+
+  return true;
+}
+
+void PlatformMacOS::InitMonitors(ImGuiPlatformIO& platform_io)
+{
+  @autoreleasepool
+  {
+  // from ImGui/backends/imgui_impl_osx.mm
+  platform_io.Monitors.resize(0);
+
+  NSRect firstScreenFrame = NSScreen.screens[0].frame;
+  IM_ASSERT(firstScreenFrame.origin.x == 0 && firstScreenFrame.origin.y == 0);
+
+  for (NSScreen* screen in NSScreen.screens)
+    {
+        NSRect frame = screen.frame;
+        NSRect visibleFrame = screen.visibleFrame;
+        ConvertNSRect(&frame);
+        ConvertNSRect(&visibleFrame);
+
+        ImGuiPlatformMonitor imgui_monitor;
+        imgui_monitor.MainPos = ImVec2(frame.origin.x, frame.origin.y);
+        imgui_monitor.MainSize = ImVec2(frame.size.width, frame.size.height);
+        imgui_monitor.WorkPos = ImVec2(visibleFrame.origin.x, visibleFrame.origin.y);
+        imgui_monitor.WorkSize = ImVec2(visibleFrame.size.width, visibleFrame.size.height);
+        imgui_monitor.DpiScale = screen.backingScaleFactor;
+        imgui_monitor.PlatformHandle = (__bridge_retained void*)screen;
+
+        platform_io.Monitors.push_back(imgui_monitor);
+    }
+  }
+}
+
+void PlatformMacOS::RegisterMainViewport()
+{
+  ImGui_MacOS_Data* bd = (ImGui_MacOS_Data*)ImGui::GetIO().BackendPlatformUserData;
+
+  ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+  ImGui_MacOS_ViewportData* vd = IM_NEW(ImGui_MacOS_ViewportData)();
+  vd->Window = bd->Window;
+  vd->WindowOwned = false;
+  main_viewport->PlatformUserData = vd;
+  main_viewport->PlatformHandle = main_viewport->PlatformHandleRaw = (__bridge void*)vd->Window;
+}
+
+void PlatformMacOS::CreateWindow(ImGuiViewport* vp)
+{
+  @autoreleasepool
+  {
+  ImGui_MacOS_Data* bd = (ImGui_MacOS_Data*)ImGui::GetIO().BackendPlatformUserData;
+  ImGui_MacOS_ViewportData* vd = IM_NEW(ImGui_MacOS_ViewportData)();
+  vp->PlatformUserData = vd;
+
+  NSScreen* screen = bd->Window.screen;
+  NSRect rect = NSMakeRect(vp->Pos.x, vp->Pos.y, vp->Size.x, vp->Size.y);
+  ConvertNSRect(&rect);
+
+  NSWindowStyleMask styleMask = 0;
+  if (vp->Flags & ImGuiViewportFlags_NoDecoration)
+      styleMask |= NSWindowStyleMaskBorderless;
+  else
+      styleMask |= NSWindowStyleMaskTitled | NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable;
+
+  __block NSWindow* window;
+  dispatch_sync(dispatch_get_main_queue(), ^{window = [[NSWindow alloc] initWithContentRect:rect
+                                                styleMask:styleMask
+                                                backing:NSBackingStoreBuffered
+                                                defer:YES
+                                                screen:screen];});
+
+  if (vp->Flags & ImGuiViewportFlags_TopMost)
+    [window setLevel:NSFloatingWindowLevel];
+
+  window.title = @"Untitled";
+  window.opaque = YES;
+
+  NSView* view = [[NSView alloc] initWithFrame:rect];
+
+    window.contentView = view;
+
+  vd->Window = window;
+  vd->WindowOwned = true;
+  vp->PlatformRequestResize = false;
+  vp->PlatformHandle = vp->PlatformHandleRaw = (__bridge_retained void*)window;
+  }
+}
+
+void PlatformMacOS::DestroyWindow(ImGuiViewport *vp)
+{
+  return;
+}
+
+ImVec2 PlatformMacOS::GetWindowPos(ImGuiViewport *vp)
+{
+  return {};
+}
+
+void PlatformMacOS::SetWindowPos(ImGuiViewport *vp, ImVec2 size)
+{
+  return;
+}
+
+ImVec2 PlatformMacOS::GetWindowSize(ImGuiViewport *vp)
+{
+  return {};
+}
+
+void PlatformMacOS::SetWindowSize(ImGuiViewport *vp, ImVec2 size)
+{
+  return;
+}
+
+void PlatformMacOS::SetImGuiWindowTitle(ImGuiViewport *vp, const char *str)
+{
+  @autoreleasepool
+  {
+    NSWindow* window = (__bridge NSWindow*)vp->PlatformHandle;
+    NSString* title = [NSString stringWithUTF8String: str];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [window setTitle:title];
+    });
+  }
+}
+
+void PlatformMacOS::ShowWindow(ImGuiViewport *vp)
+{
+  ImGui_MacOS_ViewportData* vd = (ImGui_MacOS_ViewportData*)vp->PlatformUserData;
+  IM_ASSERT(vd->Window != 0);
+
+  if (vp->Flags & ImGuiViewportFlags_NoFocusOnAppearing)
+      dispatch_sync(dispatch_get_main_queue(), ^{[vd->Window orderFront:nil]; });
+  else
+      dispatch_sync(dispatch_get_main_queue(), ^{[vd->Window makeKeyAndOrderFront:nil]; });
+
+  dispatch_sync(dispatch_get_main_queue(), ^{[vd->Window setIsVisible:YES]; });
 }
 
 }  // namespace

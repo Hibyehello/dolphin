@@ -1,7 +1,10 @@
+#include <memory>
 #include <nfd.h>
 #include <string>
 #include <vector>
 
+#include "Common/WindowSystemInfo.h"
+#include "Core/Boot/Boot.h"
 #include "Core/TitleDatabase.h"
 #include "UICommon/GameFile.h"
 #include "UICommon/GameFileCache.h"
@@ -13,6 +16,9 @@ class GameList {
 
 public:
   void ShowGameListWidget();
+  
+  bool GameSelected() { return ready_to_launch; }
+  std::string& GameToLaunch() { return game_to_launch; }
 
 private:
   void SetIsoPath();
@@ -22,7 +28,8 @@ private:
   std::vector<std::shared_ptr<const UICommon::GameFile>> m_games;
   Core::TitleDatabase m_title_database;
   UICommon::GameFileCache m_cache;
-  bool all_games_added;
+  std::string game_to_launch;
+  bool ready_to_launch;
 };
 
 }

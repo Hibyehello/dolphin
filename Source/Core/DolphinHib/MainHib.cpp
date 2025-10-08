@@ -1,6 +1,10 @@
+#include "Common/WindowSystemInfo.h"
 #include "Core/HotkeyManager.h"
 #include "PlatformCommon/Platform.h"
 #include "imgui_internal.h"
+#include <functional>
+#include <future>
+#include <memory>
 #include <nfd.h>
 
 #include <OptionParser.h>
@@ -14,6 +18,10 @@
 #include <unistd.h>
 #else
 #include <Windows.h>
+#endif
+
+#ifdef __APPLE__
+  #include <dispatch/dispatch.h>
 #endif
 
 #include "GameList.h"
@@ -38,8 +46,9 @@
 #include "VideoCommon/VideoBackendBase.h"
 #include "VideoCommon/Present.h"
 
-static std::unique_ptr<Platform> s_platform;
 static std::thread s_hib_thread;
+static std::thread s_hib_thread2;
+static std::string game_path;
 
 static void signal_handler(int)
 {
@@ -161,9 +170,67 @@ std::unique_ptr<GBAHostInterface> Host_CreateGBAHost(std::weak_ptr<HW::GBA::Core
   return nullptr;
 }
 
-static void HibThread(WindowSystemInfo wsi) {
+static void HibThread(WindowSystemInfo wsi, std::function<void()>);
+
+static void LaunchGameFromHibUI()
+{
+  std::unique_ptr<Platform> _platform;
+
+  #if HAVE_X11
+    _platform = Platform::CreateX11Platform();
+  #endif
+
+  #ifdef __linux__
+    _platform = Platform::CreateFBDevPlatform();
+  #endif
+
+  #ifdef _WIN32
+    _platform = Platform::CreateWin32Platform();
+  #endif
+
+  #ifdef __APPLE__
+      _platform = Platform::CreateMacOSPlatform();
+  #endif
+
+  if (!_platform->Init())
+  {
+      fprintf(stderr, "Platform failed to initialize.\n");
+      return;
+  }
+
+  _platform->SetTitle("Dolphin Custom"); 
+
+
+  WindowSystemInfo wsi = _platform->GetWindowSystemInfo();
+
+  // Manually reactivate the video backend in case a GameINI overrides the video backend setting.
+  VideoBackendBase::PopulateBackendInfo(wsi);
+
+  // Issue any API calls which must occur on the main thread for the graphics backend.
+  WindowSystemInfo prepared_wsi(wsi);
+  g_video_backend->PrepareWindow(prepared_wsi);
+
+  s_hib_thread2 = std::thread(HibThread, prepared_wsi, LaunchGameFromHibUI);
+
+
+
+  _platform->MainLoop();
+
+  std::unique_ptr<BootParameters> boot = BootParameters::GenerateFromFile(
+        game_path, BootSessionData({}, DeleteSavestateAfterBoot::No));
+
+  if (!BootManager::BootCore(Core::System::GetInstance(), std::move(boot), wsi))
+  {
+    fprintf(stderr, "Could not boot the specified file\n");
+    return;
+  }
+}
+
+static void HibThread(WindowSystemInfo wsi, std::function<void()> launchGame) {
   Common::SetCurrentThreadName("HibUI");
   
+  ASSERT_MSG(VIDEOINTERFACE, s_platform, "s_platform Not Initialized!");
+
   if (!g_video_backend->Initialize(wsi))
   {
       PanicAlertFmt("Failed to initialize video backend!");
@@ -219,10 +286,21 @@ static void HibThread(WindowSystemInfo wsi) {
 
     game_list.ShowGameListWidget();
 
+    if(game_list.GameSelected()) {
+      game_path = game_list.GameToLaunch();
+#ifdef __APPLE__
+      dispatch_sync(dispatch_get_main_queue(), ^{ LaunchGameFromHibUI(); });
+#else
+      LaunchGameFromHibUI();
+#endif
+      return;
+    }
+
     Common::SleepCurrentThread(16);
   }
 
-    g_video_backend->Shutdown();
+  // User just quit dolphin
+  g_video_backend->Shutdown();
 }
 
 int main(const int argc, char* argv[])
@@ -297,9 +375,9 @@ int main(const int argc, char* argv[])
       return 1;
   }
 
-  s_platform->SetTitle("Dolphin Custom");
-
-  const WindowSystemInfo wsi = s_platform->GetWindowSystemInfo();
+  s_platform->SetTitle("Dolphin Custom");  
+  
+  WindowSystemInfo wsi = s_platform->GetWindowSystemInfo();
 
   UICommon::SetUserDirectory(user_directory);
   UICommon::CreateDirectories();
@@ -353,8 +431,10 @@ int main(const int argc, char* argv[])
     WindowSystemInfo prepared_wsi(wsi);
     g_video_backend->PrepareWindow(prepared_wsi);
 
-    s_hib_thread = std::thread(HibThread, prepared_wsi);
+    s_hib_thread = std::thread(HibThread, prepared_wsi, LaunchGameFromHibUI);
   }
+
+  
 
   s_platform->MainLoop();
   Core::Stop(Core::System::GetInstance());

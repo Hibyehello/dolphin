@@ -7,8 +7,11 @@
 #include "Core/IOS/IOS.h"
 #include "Core/IOS/STM/STM.h"
 #include "Core/System.h"
+#include <memory>
 
 Platform::~Platform() = default;
+
+std::unique_ptr<Platform> s_platform;
 
 bool Platform::Init()
 {
