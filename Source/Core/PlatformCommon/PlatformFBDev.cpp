@@ -3,7 +3,7 @@
 
 #include <unistd.h>
 
-#include "DolphinNoGUI/Platform.h"
+#include "PlatformCommon/Platform.h"
 
 #include "Common/MsgHandler.h"
 #include "Core/ConfigManager.h"

@@ -93,6 +93,7 @@ endif()
 option(USE_UPNP "Enables UPnP port mapping support" ON)
 option(ENABLE_NOGUI "Enable NoGUI frontend" ON)
 option(ENABLE_QT "Enable Qt (Default)" ON)
+option(ENABLE_CUSTOM "Enable Hibyehello's custom ui" ON)
 option(ENABLE_LTO "Enables Link Time Optimization" OFF)
 option(ENABLE_GENERIC "Enables generic build that should run on any little-endian host" OFF)
 option(ENABLE_HEADLESS "Enables running Dolphin as a headless variant" OFF)
@@ -648,6 +649,10 @@ add_subdirectory(Externals/cpp-optparse)
 dolphin_find_optional_system_library_pkgconfig(FMT
   fmt>=10.1 fmt::fmt Externals/fmt
 )
+
+if (ENABLE_CUSTOM)
+  add_subdirectory(Externals/nativefiledialog)
+endif()
 
 add_subdirectory(Externals/imgui)
 add_subdirectory(Externals/implot)

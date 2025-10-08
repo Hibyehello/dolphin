@@ -9,7 +9,7 @@
 #include <X11/X.h>
 static constexpr auto X_None = None;
 
-#include "DolphinNoGUI/Platform.h"
+#include "PlatformCommon/Platform.h"
 
 #include "Common/MsgHandler.h"
 #include "Core/Config/MainSettings.h"

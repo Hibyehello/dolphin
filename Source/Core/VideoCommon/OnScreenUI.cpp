@@ -14,6 +14,7 @@
 #include "Core/Movie.h"
 #include "Core/System.h"
 
+#include "PlatformCommon/Platform.h"
 #include "VideoCommon/AbstractGfx.h"
 #include "VideoCommon/AbstractPipeline.h"
 #include "VideoCommon/AbstractShader.h"
@@ -77,10 +78,20 @@ bool OnScreenUI::Initialize(u32 width, u32 height, float scale)
 
   // Setup new font management behavior.
   ImGui::GetIO().BackendFlags |=
-      ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset;
+      ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset | ImGuiBackendFlags_RendererHasViewports;
+
+  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+
+  ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
 
   if (!RecompileImGuiPipeline())
     return false;
+
+  s_platform->ImGuiPlatformInit();
+  s_platform->InitMonitors(ImGui::GetPlatformIO());
+
+  if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    InitMultiViewportSupport();
 
   m_imgui_last_frame_time = Common::Timer::NowUs();
   m_ready = true;
@@ -396,6 +407,13 @@ void OnScreenUI::Finalize()
   DrawChallengesAndLeaderboards();
   ImGui::Render();
 
+  if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+  {
+      ImGui::UpdatePlatformWindows();
+      ImGui::RenderPlatformWindowsDefault();
+      // TODO for OpenGL: restore current GL context.
+  }
+
   // Check for font changes
   ImGuiStyle& style = ImGui::GetStyle();
   const int size = Config::Get(Config::MAIN_OSD_FONT_SIZE);
@@ -495,6 +513,21 @@ void OnScreenUI::UpdateImguiTexture(ImTextureData* tex)
   }
 }
 
+void OnScreenUI::InitMultiViewportSupport()
+{
+  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+  platform_io.Platform_CreateWindow = [](ImGuiViewport* vp){ s_platform->CreateWindow(vp); };
+  platform_io.Platform_DestroyWindow = [](ImGuiViewport* vp){ s_platform->DestroyWindow(vp); };
+  platform_io.Platform_GetWindowPos = [](ImGuiViewport* vp){ return s_platform->GetWindowPos(vp); };
+  platform_io.Platform_SetWindowPos = [](ImGuiViewport* vp, ImVec2 pos){ s_platform->SetWindowPos(vp, pos); };
+  platform_io.Platform_GetWindowSize = [](ImGuiViewport* vp){ return s_platform->GetWindowSize(vp); };
+  platform_io.Platform_SetWindowSize = [](ImGuiViewport* vp, ImVec2 pos){ s_platform->SetWindowSize(vp, pos); };
+  platform_io.Platform_SetWindowTitle = [](ImGuiViewport* vp, const char* str){ s_platform->SetImGuiWindowTitle(vp, str); };
+  platform_io.Platform_ShowWindow = [](ImGuiViewport* vp){ s_platform->ShowWindow(vp); };
+
+  s_platform->RegisterMainViewport();
+}
+
 std::unique_lock<std::mutex> OnScreenUI::GetImGuiLock()
 {
   return std::unique_lock<std::mutex>(m_imgui_mutex);
@@ -543,7 +576,7 @@ void OnScreenUI::SetKeyMap(const DolphinKeyMap& key_map)
   }
 }
 
-void OnScreenUI::SetKey(u32 key, bool is_down, const char* chars)
+bool OnScreenUI::SetKey(u32 key, bool is_down, const char* chars)
 {
   auto lock = GetImGuiLock();
   if (auto iter = m_dolphin_to_imgui_map.find(key); iter != m_dolphin_to_imgui_map.end())
@@ -551,6 +584,8 @@ void OnScreenUI::SetKey(u32 key, bool is_down, const char* chars)
 
   if (chars)
     ImGui::GetIO().AddInputCharactersUTF8(chars);
+
+  return ImGui::GetIO().WantCaptureKeyboard;
 }
 
 void OnScreenUI::SetMousePos(float x, float y)
@@ -568,6 +603,13 @@ void OnScreenUI::SetMousePress(u32 button_mask)
   {
     ImGui::GetIO().AddMouseButtonEvent(static_cast<int>(i), (button_mask & (1u << i)) != 0);
   }
+}
+
+void OnScreenUI::SetMouseScroll(float wheel_x, float wheel_y)
+{
+  auto lock = GetImGuiLock();
+
+  ImGui::GetIO().AddMouseWheelEvent(wheel_x, wheel_y);
 }
 
 }  // namespace VideoCommon

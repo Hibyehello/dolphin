@@ -12,8 +12,10 @@
 #include "VideoCommon/VideoCommon.h"
 
 #include <array>
+#include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <tuple>
 
 class AbstractTexture;
@@ -40,6 +42,7 @@ public:
   void ImmediateSwap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height, u64 ticks);
 
   void Present(std::optional<TimePoint> presentation_time = std::nullopt);
+  void PresentUI(std::optional<TimePoint> presentation_time = std::nullopt);
   void ClearLastXfbId() { m_last_xfb_id = std::numeric_limits<u64>::max(); }
 
   bool Initialize();
@@ -88,9 +91,10 @@ public:
 
   void SetKeyMap(const DolphinKeyMap& key_map);
 
-  void SetKey(u32 key, bool is_down, const char* chars);
+  bool SetKey(u32 key, bool is_down, const char* chars);
   void SetMousePos(float x, float y);
   void SetMousePress(u32 button_mask);
+  void SetMouseScroll(float wheel_x, float wheel_y);
 
   int FrameCount() const { return m_frame_count; }
 

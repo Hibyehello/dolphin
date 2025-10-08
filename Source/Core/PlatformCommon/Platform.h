@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <imgui.h>
 #include <memory>
 #include <string>
 
@@ -47,6 +48,19 @@ public:
   static std::unique_ptr<Platform> CreateMacOSPlatform();
 #endif
 
+// Imgui Platform Functions
+virtual bool ImGuiPlatformInit(void* = nullptr) = 0;
+virtual void InitMonitors(ImGuiPlatformIO& platform_io) = 0;
+virtual void RegisterMainViewport() = 0;
+virtual void CreateWindow(ImGuiViewport* vp) = 0;
+virtual void DestroyWindow(ImGuiViewport* vp) = 0;
+virtual ImVec2 GetWindowPos(ImGuiViewport* vp) = 0;
+virtual void SetWindowPos(ImGuiViewport* vp, ImVec2 pos) = 0;
+virtual ImVec2 GetWindowSize(ImGuiViewport* vp) = 0;
+virtual void SetWindowSize(ImGuiViewport* vp, ImVec2 size) = 0;
+virtual void SetImGuiWindowTitle(ImGuiViewport* vp, const char* str) = 0;
+virtual void ShowWindow(ImGuiViewport* vp) = 0;
+
 protected:
   void UpdateRunningFlag();
 
@@ -57,3 +71,5 @@ protected:
   bool m_window_focus = true;  // Should be made atomic if actually implemented
   bool m_window_fullscreen = false;
 };
+
+extern std::unique_ptr<Platform> s_platform;

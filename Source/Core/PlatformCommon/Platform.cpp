@@ -1,14 +1,17 @@
 // Copyright 2018 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include "DolphinNoGUI/Platform.h"
+#include "PlatformCommon/Platform.h"
 
 #include "Core/HW/ProcessorInterface.h"
 #include "Core/IOS/IOS.h"
 #include "Core/IOS/STM/STM.h"
 #include "Core/System.h"
+#include <memory>
 
 Platform::~Platform() = default;
+
+std::unique_ptr<Platform> s_platform;
 
 bool Platform::Init()
 {

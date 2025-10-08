@@ -1,7 +1,7 @@
 // Copyright 2019 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include "DolphinNoGUI/Platform.h"
+#include "PlatformCommon/Platform.h"
 
 #include "Core/Config/MainSettings.h"
 #include "Core/ConfigManager.h"
