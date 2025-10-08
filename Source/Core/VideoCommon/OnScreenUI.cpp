@@ -29,17 +29,19 @@
 #include "VideoCommon/VertexManagerBase.h"
 #include "VideoCommon/VideoConfig.h"
 
+#include <chrono>
 #include <inttypes.h>
 #include <mutex>
 
 #include <imgui.h>
 #include <implot.h>
+#include <optional>
 
 namespace VideoCommon
 {
 bool OnScreenUI::Initialize(u32 width, u32 height, float scale)
 {
-  std::unique_lock<std::mutex> imgui_lock(m_imgui_mutex);
+  std::unique_lock<std::timed_mutex> imgui_lock(m_imgui_mutex);
 
   if (!IMGUI_CHECKVERSION())
   {
@@ -102,7 +104,7 @@ bool OnScreenUI::Initialize(u32 width, u32 height, float scale)
 
 OnScreenUI::~OnScreenUI()
 {
-  std::unique_lock<std::mutex> imgui_lock(m_imgui_mutex);
+  std::unique_lock<std::timed_mutex> imgui_lock(m_imgui_mutex);
 
   ImGui::EndFrame();
   ImPlot::DestroyContext();
@@ -178,7 +180,7 @@ bool OnScreenUI::RecompileImGuiPipeline()
 
 void OnScreenUI::BeginImGuiFrame(u32 width, u32 height)
 {
-  std::unique_lock<std::mutex> imgui_lock(m_imgui_mutex);
+  std::unique_lock<std::timed_mutex> imgui_lock(m_imgui_mutex);
   BeginImGuiFrameUnlocked(width, height);
 }
 
@@ -217,7 +219,7 @@ void OnScreenUI::DrawImGui()
     float padding[2];
   };
   ImGuiUbo ubo = {{1.0f / m_backbuffer_width * 2.0f, 1.0f / m_backbuffer_height * 2.0f}};
-
+  
   // Set up common state for drawing.
   g_gfx->SetPipeline(m_imgui_pipeline.get());
   g_gfx->SetSamplerState(0, RenderState::GetPointSamplerState());
@@ -515,6 +517,7 @@ void OnScreenUI::UpdateImguiTexture(ImTextureData* tex)
 
 void OnScreenUI::InitMultiViewportSupport()
 {
+  
   ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
   platform_io.Platform_CreateWindow = [](ImGuiViewport* vp){ s_platform->CreateWindow(vp); };
   platform_io.Platform_DestroyWindow = [](ImGuiViewport* vp){ s_platform->DestroyWindow(vp); };
@@ -528,9 +531,13 @@ void OnScreenUI::InitMultiViewportSupport()
   s_platform->RegisterMainViewport();
 }
 
-std::unique_lock<std::mutex> OnScreenUI::GetImGuiLock()
+std::optional<std::unique_lock<std::timed_mutex>> OnScreenUI::GetImGuiLock(const std::chrono::milliseconds timeout)
 {
-  return std::unique_lock<std::mutex>(m_imgui_mutex);
+  auto lock = std::unique_lock<std::timed_mutex>(m_imgui_mutex, std::defer_lock);
+  if(lock.try_lock_for(timeout))
+    return lock;
+
+  return std::nullopt;
 }
 
 void OnScreenUI::SetScale(float backbuffer_scale)
@@ -578,38 +585,38 @@ void OnScreenUI::SetKeyMap(const DolphinKeyMap& key_map)
 
 bool OnScreenUI::SetKey(u32 key, bool is_down, const char* chars)
 {
-  auto lock = GetImGuiLock();
-  if (auto iter = m_dolphin_to_imgui_map.find(key); iter != m_dolphin_to_imgui_map.end())
-    ImGui::GetIO().AddKeyEvent((ImGuiKey)iter->second, is_down);
+  if(auto lock = GetImGuiLock())
+  {
+    if (auto iter = m_dolphin_to_imgui_map.find(key); iter != m_dolphin_to_imgui_map.end())
+      ImGui::GetIO().AddKeyEvent((ImGuiKey)iter->second, is_down);
 
-  if (chars)
-    ImGui::GetIO().AddInputCharactersUTF8(chars);
+    if (chars)
+      ImGui::GetIO().AddInputCharactersUTF8(chars);
 
-  return ImGui::GetIO().WantCaptureKeyboard;
+    return ImGui::GetIO().WantCaptureKeyboard;
+  }
+  return false;
 }
 
 void OnScreenUI::SetMousePos(float x, float y)
 {
-  auto lock = GetImGuiLock();
-
-  ImGui::GetIO().AddMousePosEvent(x, y);
+  if(auto lock = GetImGuiLock())
+    ImGui::GetIO().AddMousePosEvent(x, y);
 }
 
 void OnScreenUI::SetMousePress(u32 button_mask)
 {
-  auto lock = GetImGuiLock();
-
-  for (size_t i = 0; i < std::size(ImGui::GetIO().MouseDown); i++)
-  {
-    ImGui::GetIO().AddMouseButtonEvent(static_cast<int>(i), (button_mask & (1u << i)) != 0);
-  }
+  if(auto lock = GetImGuiLock())
+    for (size_t i = 0; i < std::size(ImGui::GetIO().MouseDown); i++)
+    {
+      ImGui::GetIO().AddMouseButtonEvent(static_cast<int>(i), (button_mask & (1u << i)) != 0);
+    }
 }
 
 void OnScreenUI::SetMouseScroll(float wheel_x, float wheel_y)
 {
-  auto lock = GetImGuiLock();
-
-  ImGui::GetIO().AddMouseWheelEvent(wheel_x, wheel_y);
+  if(auto lock = GetImGuiLock())
+    ImGui::GetIO().AddMouseWheelEvent(wheel_x, wheel_y);
 }
 
 }  // namespace VideoCommon

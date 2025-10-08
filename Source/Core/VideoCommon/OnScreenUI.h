@@ -32,7 +32,7 @@ public:
   // Returns a lock for the ImGui mutex, enabling data structures to be modified from outside.
   // Use with care, only non-drawing functions should be called from outside the video thread,
   // as the drawing is tied to a "frame".
-  std::unique_lock<std::mutex> GetImGuiLock();
+  std::optional<std::unique_lock<std::timed_mutex>> GetImGuiLock(const std::chrono::milliseconds timeout = std::chrono::milliseconds(16));
 
   bool IsReady() { return m_ready; }
 
@@ -73,7 +73,7 @@ private:
   std::vector<std::unique_ptr<AbstractTexture>> m_imgui_textures;
   std::unique_ptr<AbstractPipeline> m_imgui_pipeline;
   std::map<u32, int> m_dolphin_to_imgui_map;
-  std::mutex m_imgui_mutex;
+  std::timed_mutex m_imgui_mutex;
   u64 m_imgui_last_frame_time = 0;
 
   u32 m_backbuffer_width = 1;

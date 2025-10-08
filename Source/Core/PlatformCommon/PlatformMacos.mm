@@ -148,6 +148,7 @@ public:
   void SetWindowSize(ImGuiViewport* vp, ImVec2 size) override;
   void SetImGuiWindowTitle(ImGuiViewport* vp, const char* str) override;
   void ShowWindow(ImGuiViewport* vp) override;
+  void RenderWindow(ImGuiViewport *vp);
 
 private:
   void ProcessEvents();
@@ -242,13 +243,12 @@ void PlatformMacOS::SetTitle(const std::string& title)
 }
 
 void PlatformMacOS::MainLoop()
-{
-
+{ 
   while (IsRunning())
   {
     UpdateRunningFlag();
     Core::HostDispatchJobs(Core::System::GetInstance());
-    ProcessEvents();
+    this->ProcessEvents();
     UpdateWindowPosition();
   }
 }
@@ -643,27 +643,66 @@ void PlatformMacOS::CreateWindow(ImGuiViewport* vp)
 
 void PlatformMacOS::DestroyWindow(ImGuiViewport *vp)
 {
-  return;
+    if (ImGui_MacOS_ViewportData* vd = (ImGui_MacOS_ViewportData*)vp->PlatformUserData)
+  {
+      NSWindow* window = vd->Window;
+      if (window != nil && vd->WindowOwned)
+      {
+          window.contentView = nil;
+          window.contentViewController = nil;
+          [window orderOut:nil];
+      }
+      vd->Window = nil;
+      IM_DELETE(vd);
+  }
+  vp->PlatformUserData = vp->PlatformHandle = vp->PlatformHandleRaw = nullptr;
 }
 
 ImVec2 PlatformMacOS::GetWindowPos(ImGuiViewport *vp)
 {
-  return {};
+  ImGui_MacOS_ViewportData* vd = (ImGui_MacOS_ViewportData*)vp->PlatformUserData;
+  IM_ASSERT(vd->Window != 0);
+
+  NSWindow* window = vd->Window;
+  NSRect frame = window.contentView.frame;
+
+  return ImVec2(frame.origin.x, frame.origin.y);
 }
 
-void PlatformMacOS::SetWindowPos(ImGuiViewport *vp, ImVec2 size)
+void PlatformMacOS::SetWindowPos(ImGuiViewport *vp, ImVec2 pos)
 {
-  return;
+    ImGui_MacOS_ViewportData* vd = (ImGui_MacOS_ViewportData*)vp->PlatformUserData;
+    IM_ASSERT(vd->Window != 0);
+
+    NSWindow* window = vd->Window;
+    NSSize size = window.frame.size;
+
+    NSRect r = NSMakeRect(pos.x, pos.y, size.width, size.height);
+    ConvertNSRect(&r);
+    [window setFrameOrigin:r.origin];
 }
 
 ImVec2 PlatformMacOS::GetWindowSize(ImGuiViewport *vp)
 {
-  return {};
+    ImGui_MacOS_ViewportData* vd = (ImGui_MacOS_ViewportData*)vp->PlatformUserData;
+    IM_ASSERT(vd->Window != 0);
+
+    NSWindow* window = vd->Window;
+    NSSize size = window.contentLayoutRect.size;
+    return ImVec2(size.width, size.height);
 }
 
 void PlatformMacOS::SetWindowSize(ImGuiViewport *vp, ImVec2 size)
 {
-  return;
+    ImGui_MacOS_ViewportData* vd = (ImGui_MacOS_ViewportData*)vp->PlatformUserData;
+    IM_ASSERT(vd->Window != 0);
+
+    NSWindow* window = vd->Window;
+    NSRect rect = window.frame;
+    rect.origin.y -= (size.y - rect.size.height);
+    rect.size.width = size.x;
+    rect.size.height = size.y;
+    [window setFrame:rect display:YES];
 }
 
 void PlatformMacOS::SetImGuiWindowTitle(ImGuiViewport *vp, const char *str)
@@ -684,11 +723,16 @@ void PlatformMacOS::ShowWindow(ImGuiViewport *vp)
   IM_ASSERT(vd->Window != 0);
 
   if (vp->Flags & ImGuiViewportFlags_NoFocusOnAppearing)
-      dispatch_sync(dispatch_get_main_queue(), ^{[vd->Window orderFront:nil]; });
+      dispatch_async(dispatch_get_main_queue(), ^{[vd->Window orderFront:nil]; });
   else
-      dispatch_sync(dispatch_get_main_queue(), ^{[vd->Window makeKeyAndOrderFront:nil]; });
+      dispatch_async(dispatch_get_main_queue(), ^{[vd->Window makeKeyAndOrderFront:nil]; });
 
-  dispatch_sync(dispatch_get_main_queue(), ^{[vd->Window setIsVisible:YES]; });
+  dispatch_async(dispatch_get_main_queue(), ^{[vd->Window setIsVisible:YES]; });
+}
+
+void PlatformMacOS::RenderWindow(ImGuiViewport *vp)
+{
+
 }
 
 }  // namespace
