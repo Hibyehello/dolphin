@@ -145,12 +145,13 @@ InputBackend::InputBackend(ControllerInterface* controller_interface)
   //  call within SDL.
   SDL_SetHint(SDL_HINT_JOYSTICK_DIRECTINPUT, "0");
 
+#ifdef TODO
   m_hotplug_thread = std::thread([this] {
     Common::SetCurrentThreadName("SDL Hotplug Thread");
 
     Common::ScopeGuard quit_guard([] {
       // TODO: there seems to be some sort of memory leak with SDL, quit isn't freeing everything up
-      //SDL_Quit();
+      SDL_Quit();
     });
     {
       Common::ScopeGuard init_guard([this] { m_init_event.Set(); });
@@ -175,23 +176,25 @@ InputBackend::InputBackend(ControllerInterface* controller_interface)
       // ControllerInterface::Init/RefreshDevices has cleared its list of devices, resulting in
       // duplicate devices. Adding devices will actually "fail" here, as the ControllerInterface
       // hasn't finished initializing yet.
-      // SDL_Event e;
-      // while (SDL_PollEvent(&e))
-      // {
-      //   if (!HandleEventAndContinue(e))
-      //     return;
-      // }
+      SDL_Event e;
+      while (SDL_PollEvent(&e))
+      {
+        if (!HandleEventAndContinue(e))
+          return;
+      }
     }
 
-    // SDL_Event e;
-    // while (SDL_WaitEvent(&e))
-    // {
-    //   if (!HandleEventAndContinue(e))
-    //     return;
-    // }
+    SDL_Event e;
+    while (SDL_WaitEvent(&e))
+    {
+      if (!HandleEventAndContinue(e))
+        return;
+    }
   });
 
+
   m_init_event.Wait();
+#endif
 }
 
 InputBackend::~InputBackend()

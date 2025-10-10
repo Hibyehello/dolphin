@@ -148,6 +148,10 @@ if(NOT ANDROID)
   target_link_libraries(inputcommon PUBLIC LibUSB::LibUSB)
 endif()
 
+if(TODO_SDL)
+  target_compile_definitions(MyTarget PRIVATE TODO)
+endif()
+
 if(LIBEVDEV_FOUND AND LIBUDEV_FOUND)
   target_sources(inputcommon
   PRIVATE
