@@ -32,6 +32,19 @@ PRIVATE
   cpp-optparse
 )
 
+if(ENABLE_SDL)
+  target_compile_definitions(dolphin-nogui PRIVATE ENABLE_SDL)
+  target_sources(dolphin-nogui PRIVATE PlatformSDL.cpp)
+  target_link_libraries(dolphin-nogui
+  PRIVATE
+    SDL3::SDL3
+  )
+
+  if(APPLE)
+    target_sources(dolphin-nogui PRIVATE PlatformSDL.mm)
+  endif()
+endif()
+
 if(APPLE)
   target_link_libraries(dolphin-nogui
     PRIVATE

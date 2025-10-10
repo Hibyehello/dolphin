@@ -176,6 +176,10 @@ static std::unique_ptr<Platform> GetPlatform(const optparse::Values& options)
   if (platform_name == "macos" || platform_name.empty())
     return Platform::CreateMacOSPlatform();
 #endif
+#ifdef ENABLE_SDL
+  if(platform_name == "sdl" || platform_name.empty())
+    return Platform::CreateSDLPlatform();
+#endif
 
   if (platform_name == "headless" || platform_name.empty())
     return Platform::CreateHeadlessPlatform();
@@ -212,6 +216,10 @@ int main(const int argc, char* argv[])
 #ifdef __APPLE__
                 ,
                 "macos"
+#endif
+#ifdef ENABLE_SDL
+                ,
+                "sdl"
 #endif
       });
 

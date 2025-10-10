@@ -9,6 +9,12 @@
 #include "Common/Flag.h"
 #include "Common/WindowSystemInfo.h"
 
+#ifdef ENABLE_SDL
+extern "C" {
+  void* getContentView(void*);
+}
+#endif
+
 class Platform
 {
 public:
@@ -45,6 +51,10 @@ public:
 
 #ifdef __APPLE__
   static std::unique_ptr<Platform> CreateMacOSPlatform();
+#endif
+
+#ifdef ENABLE_SDL
+  static std::unique_ptr<Platform> CreateSDLPlatform();
 #endif
 
 protected:
