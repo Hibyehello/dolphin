@@ -23,7 +23,7 @@
 #endif
 
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR)
-#include <wayland_client_core.h>
+#include <wayland-client.h>
 #endif
 
 namespace Vulkan
@@ -327,8 +327,18 @@ bool SwapChain::CreateSwapChain()
   VkExtent2D size = surface_capabilities.currentExtent;
   if (size.width == UINT32_MAX)
   {
-    size.width = std::max(g_presenter->GetBackbufferWidth(), 1);
-    size.height = std::max(g_presenter->GetBackbufferHeight(), 1);
+    // If on Wayland we need to choose a reasonable size because wayland won't choose
+    if(!g_presenter && m_wsi.type == WindowSystemType::Wayland)
+    {
+      uint32_t h = 1000;
+      size.width = std::clamp(h, surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width);
+      size.height = std::clamp(h, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
+    }
+    else
+    {
+      size.width = std::max(g_presenter->GetBackbufferWidth(), 1);
+      size.height = std::max(g_presenter->GetBackbufferHeight(), 1);
+    }
   }
   size.width = std::clamp(size.width, surface_capabilities.minImageExtent.width,
                           surface_capabilities.maxImageExtent.width);

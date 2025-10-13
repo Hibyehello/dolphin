@@ -7,6 +7,7 @@
 
 #include "Common/WindowSystemInfo.h"
 #include "Platform.h"
+#include "VideoCommon/Present.h"
 
 #ifdef __APPLE__
   #include <dispatch/dispatch.h>
@@ -64,7 +65,7 @@ bool PlatformSDL::Init()
     return false;
   }
 
-  m_window = SDL_CreateWindow("Dolphin-emu-nogui", m_window_width, m_window_height, 0);
+  m_window = SDL_CreateWindow("Dolphin-emu-nogui", m_window_width, m_window_height, SDL_WINDOW_RESIZABLE);
 
   if(m_window == nullptr)
   {
@@ -149,6 +150,9 @@ void PlatformSDL::ProcessEvents()
       default:
         break;
     }
+
+    if(g_presenter)
+      g_presenter->ResizeSurface();
   }
 }
 
