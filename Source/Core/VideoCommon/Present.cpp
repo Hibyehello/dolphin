@@ -510,9 +510,10 @@ void Presenter::ChangeSurface(void* new_surface_handle)
   m_surface_changed.Set();
 }
 
-void Presenter::ResizeSurface()
+void Presenter::ResizeSurface(uint32_t width, uint32_t height)
 {
   std::lock_guard<std::mutex> lock(m_swap_mutex);
+  g_gfx->ResizeSurface(height, width);
   m_surface_resized.Set();
 }
 

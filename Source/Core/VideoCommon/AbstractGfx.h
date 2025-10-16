@@ -169,9 +169,18 @@ public:
   // Returns info about the main surface (aka backbuffer)
   virtual SurfaceInfo GetSurfaceInfo() const = 0;
 
+  void ResizeSurface(uint32_t height = 0, uint32_t width = 0)
+  {
+    m_new_height = height;
+    m_new_width = width;
+  }
+
 protected:
   AbstractFramebuffer* m_current_framebuffer = nullptr;
   const AbstractPipeline* m_current_pipeline = nullptr;
+
+  uint32_t m_new_height;
+  uint32_t m_new_width;
 
 private:
   Common::EventHook m_config_changed;

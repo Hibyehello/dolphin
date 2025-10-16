@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -53,6 +54,8 @@ public:
     return m_swap_chain_images[m_current_swap_chain_image_index].framebuffer.get();
   }
   VkResult AcquireNextImage();
+
+  void UpdateSize(uint32_t height, uint32_t width);
 
   bool RecreateSurface(void* native_handle);
   bool ResizeSwapChain();

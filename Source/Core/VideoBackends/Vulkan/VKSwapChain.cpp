@@ -325,21 +325,17 @@ bool SwapChain::CreateSwapChain()
   // Determine the dimensions of the swap chain. Values of -1 indicate the size we specify here
   // determines window size?
   VkExtent2D size = surface_capabilities.currentExtent;
-  if (size.width == UINT32_MAX)
+  if (size.width == UINT32_MAX && m_wsi.type != WindowSystemType::Wayland)
   {
-    // If on Wayland we need to choose a reasonable size because wayland won't choose
-    if(!g_presenter && m_wsi.type == WindowSystemType::Wayland)
-    {
-      uint32_t h = 1000;
-      size.width = std::clamp(h, surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width);
-      size.height = std::clamp(h, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
-    }
-    else
-    {
-      size.width = std::max(g_presenter->GetBackbufferWidth(), 1);
-      size.height = std::max(g_presenter->GetBackbufferHeight(), 1);
-    }
+    size.width = std::max(g_presenter->GetBackbufferWidth(), 1);
+    size.height = std::max(g_presenter->GetBackbufferHeight(), 1);
+  } else if(m_wsi.type == WindowSystemType::Wayland)
+  {
+    size.width = m_wsi.width;
+    size.height = m_wsi.height;
   }
+
+  fprintf(stderr, "VKSwapChain: %d, %d\n", size.height, size.width);
   size.width = std::clamp(size.width, surface_capabilities.minImageExtent.width,
                           surface_capabilities.maxImageExtent.width);
   size.height = std::clamp(size.height, surface_capabilities.minImageExtent.height,
@@ -536,6 +532,11 @@ VkResult SwapChain::AcquireNextImage()
     LOG_VULKAN_ERROR(res, "vkAcquireNextImageKHR failed: ");
 
   return res;
+}
+
+void SwapChain::UpdateSize(uint32_t height, uint32_t width) {
+  m_wsi.height = height;
+  m_wsi.width = width;
 }
 
 bool SwapChain::ResizeSwapChain()

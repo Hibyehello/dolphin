@@ -107,12 +107,12 @@ WindowSystemInfo PlatformSDL::GetWindowSystemInfo() const
   wsi.render_window = (void*)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
 #endif
 #ifdef __linux__
-  if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0) 
+  if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0)
   {
     wsi.type = WindowSystemType::X11;
     wsi.display_connection = (void*)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
     wsi.render_window = (void*)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, NULL);
-  } else if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) 
+  } else if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0)
   {
     wsi.type = WindowSystemType::Wayland;
     wsi.display_connection = (void*)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, NULL);
@@ -125,18 +125,20 @@ WindowSystemInfo PlatformSDL::GetWindowSystemInfo() const
 #endif
 
 wsi.render_surface = wsi.render_window;
+wsi.height = m_window_height;
+wsi.width = m_window_width;
 
 return wsi;
 }
 
-void PlatformSDL::ProcessEvents() 
+void PlatformSDL::ProcessEvents()
 {
   SDL_Event e;
 
 
   while(SDL_PollEvent(&e))
   {
-    switch(e.type) 
+    switch(e.type)
     {
       case SDL_EVENT_QUIT:
         RequestShutdown();
@@ -151,8 +153,10 @@ void PlatformSDL::ProcessEvents()
         break;
     }
 
+    fprintf(stderr, "PlatformSDL: %d, %d\n", m_window_height, m_window_width);
+
     if(g_presenter)
-      g_presenter->ResizeSurface();
+      g_presenter->ResizeSurface(m_window_width, m_window_height);
   }
 }
 
