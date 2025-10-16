@@ -149,7 +149,7 @@ if(NOT ANDROID)
 endif()
 
 if(TODO_SDL)
-  target_compile_definitions(MyTarget PRIVATE TODO)
+  target_compile_definitions(inputcommon PRIVATE TODO)
 endif()
 
 if(LIBEVDEV_FOUND AND LIBUDEV_FOUND)
