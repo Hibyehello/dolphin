@@ -81,7 +81,7 @@ public:
   // Final surface changing
   // This is called when the surface is resized (WX) or the window changes (Android).
   void ChangeSurface(void* new_surface_handle);
-  void ResizeSurface();
+  void ResizeSurface(uint32_t width = 0, uint32_t height = 0);
   bool SurfaceResizedTestAndClear() { return m_surface_resized.TestAndClear(); }
   bool SurfaceChangedTestAndClear() { return m_surface_changed.TestAndClear(); }
   void* GetNewSurfaceHandle();
