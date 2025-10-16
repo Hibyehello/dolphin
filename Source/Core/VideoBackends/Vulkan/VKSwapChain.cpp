@@ -335,7 +335,6 @@ bool SwapChain::CreateSwapChain()
     size.height = m_wsi.height;
   }
 
-  fprintf(stderr, "VKSwapChain: %d, %d\n", size.height, size.width);
   size.width = std::clamp(size.width, surface_capabilities.minImageExtent.width,
                           surface_capabilities.maxImageExtent.width);
   size.height = std::clamp(size.height, surface_capabilities.minImageExtent.height,

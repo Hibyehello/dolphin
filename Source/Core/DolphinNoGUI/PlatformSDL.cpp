@@ -153,8 +153,6 @@ void PlatformSDL::ProcessEvents()
         break;
     }
 
-    fprintf(stderr, "PlatformSDL: %d, %d\n", m_window_height, m_window_width);
-
     if(g_presenter)
       g_presenter->ResizeSurface(m_window_width, m_window_height);
   }
