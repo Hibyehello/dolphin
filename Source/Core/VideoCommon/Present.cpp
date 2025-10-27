@@ -7,6 +7,7 @@
 #include "Core/API/Events.h"
 #include "Core/Config/MainSettings.h"
 #include "Core/Config/GraphicsSettings.h"
+#include "Core/Config/MainSettings.h"
 #include "Core/CoreTiming.h"
 #include "Core/HW/VideoInterface.h"
 #include "Core/Core.h"
@@ -205,8 +206,13 @@ void Presenter::ViSwap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height,
 
   if (!is_duplicate || !g_ActiveConfig.bSkipPresentingDuplicateXFBs)
   {
-    if (!Config::Get(Config::MAIN_REMOVE_UI_DELAY))
+    // If RushFramePresentation is enabled, ignore the proper time to present as soon as possible.
+    // The goal is to achieve the lowest possible input latency.
+    if (Config::Get(Config::MAIN_RUSH_FRAME_PRESENTATION))
+      Present();
+    else
       Present(presentation_time);
+
     ProcessFrameDumping(ticks);
 
     video_events.after_present_event.Trigger(present_info);
