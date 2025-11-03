@@ -31,12 +31,13 @@ static PyThreadState* InitMainPythonInterpreter()
 {
 #ifdef _WIN32
   static const std::wstring python_home = UTF8ToWString(File::GetExeDirectory()) + L"/python-embed";
-  static const std::wstring python_path =
-      UTF8ToWString(File::GetCurrentDir()) + L";" +
-      UTF8ToWString(File::GetExeDirectory()) + L"/python-embed/python38.zip;" +
-      UTF8ToWString(File::GetExeDirectory()) + L"/python-embed;" +
-      UTF8ToWString(File::GetExeDirectory()) + L";" +
-      UTF8ToWString(File::GetUserPath(D_SCRIPTS_IDX)) + L";";
+  static const std::array<std::wstring, 5> python_path = {
+    UTF8ToWString(File::GetCurrentDir()),
+    UTF8ToWString(File::GetExeDirectory()) + L"/python-embed/python38.zip",
+    UTF8ToWString(File::GetExeDirectory()) + L"/python-embed",
+    UTF8ToWString(File::GetExeDirectory()),
+    UTF8ToWString(File::GetUserPath(D_SCRIPTS_IDX))
+};
 #endif
 
   if (PyImport_AppendInittab("dolio_stdout", PyInit_dolio_stdout) == -1)
@@ -63,15 +64,18 @@ static PyThreadState* InitMainPythonInterpreter()
   if (PyImport_AppendInittab("dolphin", PyInit_dolphin) == -1)
     ERROR_LOG_FMT(SCRIPTING, "failed to add dolphin to builtins");
 
-#ifdef _WIN32
-  Py_SetPythonHome(const_cast<wchar_t*>(python_home.c_str()));
-  Py_SetPath(python_path.c_str());
-#endif
   INFO_LOG_FMT(SCRIPTING, "Initializing embedded python... {}", Py_GetVersion());
   std::string scriptPath = File::GetUserPath(D_SCRIPTS_IDX);
   PyConfig config;
   PyConfig_InitPythonConfig(&config);
 
+#ifdef _WIN32
+  PyConfig_SetString(&config, &config.home, const_cast<wchar_t*>(python_home.c_str()));
+  for(const auto& path : python_path) {
+    PyWideStringList_Append(&config.module_search_paths, path.c_str());
+  }
+  config.module_search_paths_set = 1;
+#endif
   PyConfig_SetString(&config, &config.pythonpath_env, std::wstring(scriptPath.begin(), scriptPath.end()).c_str());
   
   Py_InitializeFromConfig(&config);
