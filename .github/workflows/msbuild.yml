@@ -51,4 +51,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: Dolphin-Pycore
-        path: ${{env.GITHUB_WORKSPACE}}\Binary\x64
+        path: Binary/x64/
