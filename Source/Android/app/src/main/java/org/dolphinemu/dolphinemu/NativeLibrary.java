@@ -308,6 +308,8 @@ public final class NativeLibrary
 
   public static native void ReloadConfig();
 
+  public static native void ResetDolphinSettings();
+
   public static native void UpdateGCAdapterScanThread();
 
   /**
@@ -497,7 +499,7 @@ public final class NativeLibrary
         }
         else
         {
-          AlertMessage.newInstance(caption, text, yesNo, isWarning)
+          AlertMessage.Companion.newInstance(caption, text, yesNo, isWarning)
                   .show(fragmentManager, "AlertMessage");
         }
       });
@@ -513,7 +515,7 @@ public final class NativeLibrary
 
       if (yesNo)
       {
-        result = AlertMessage.getAlertResult();
+        result = AlertMessage.Companion.getAlertResult();
       }
     }
 

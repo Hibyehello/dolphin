@@ -50,7 +50,7 @@ static std::unique_ptr<QPalette> s_default_palette;
 Settings::Settings()
 {
   qRegisterMetaType<Core::State>();
-  Core::AddOnStateChangedCallback([this](Core::State new_state) {
+  m_core_state_changed_hook = Core::AddOnStateChangedCallback([this](Core::State new_state) {
     QueueOnObject(this, [this, new_state] {
       // Avoid signal spam while continuously frame stepping. Will still send a signal for the first
       // and last framestep.
@@ -75,7 +75,7 @@ Settings::Settings()
     }
   });
 
-  m_hotplug_callback_handle = g_controller_interface.RegisterDevicesChangedCallback([this] {
+  m_hotplug_event_hook = g_controller_interface.RegisterDevicesChangedCallback([this] {
     if (Core::IsHostThread())
     {
       emit DevicesChanged();
@@ -101,7 +101,7 @@ Settings::~Settings()
 
 void Settings::UnregisterDevicesChangedCallback()
 {
-  g_controller_interface.UnregisterDevicesChangedCallback(m_hotplug_callback_handle);
+  m_hotplug_event_hook.reset();
 }
 
 Settings& Settings::Instance()
@@ -799,10 +799,7 @@ bool Settings::IsSDCardInserted() const
 void Settings::SetSDCardInserted(bool inserted)
 {
   if (IsSDCardInserted() != inserted)
-  {
     Config::SetBaseOrCurrent(Config::MAIN_WII_SD_CARD, inserted);
-    emit SDCardInsertionChanged(inserted);
-  }
 }
 
 bool Settings::IsUSBKeyboardConnected() const
@@ -813,10 +810,7 @@ bool Settings::IsUSBKeyboardConnected() const
 void Settings::SetUSBKeyboardConnected(bool connected)
 {
   if (IsUSBKeyboardConnected() != connected)
-  {
     Config::SetBaseOrCurrent(Config::MAIN_WII_KEYBOARD, connected);
-    emit USBKeyboardConnectionChanged(connected);
-  }
 }
 
 bool Settings::IsWiiSpeakMuted() const

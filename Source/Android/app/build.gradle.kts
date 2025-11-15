@@ -8,7 +8,7 @@ plugins {
 @Suppress("UnstableApiUsage")
 android {
     compileSdkVersion = "android-36"
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "29.0.14206865"
 
     buildFeatures {
         viewBinding = true
@@ -143,9 +143,6 @@ dependencies {
     // Android TV UI libraries.
     implementation("androidx.leanback:leanback:1.0.0")
     implementation("androidx.tvprovider:tvprovider:1.0.0")
-
-    // For REST calls
-    implementation("com.android.volley:volley:1.2.1")
 
     // For loading game covers from disk and GameTDB
     implementation("io.coil-kt:coil:2.6.0")
