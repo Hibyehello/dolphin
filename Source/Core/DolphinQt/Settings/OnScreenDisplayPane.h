@@ -8,6 +8,8 @@
 class QLabel;
 class ConfigBool;
 class ConfigInteger;
+class ToolTipComboBox;
+class QSlider;
 
 class OnScreenDisplayPane final : public QWidget
 {
@@ -49,4 +51,10 @@ private:
   // Debug
   ConfigBool* m_show_statistics;
   ConfigBool* m_show_proj_statistics;
+
+  // Python On-Screen Text
+  QSlider* m_imgui_font_size_slider;
+  QLabel* m_imgui_font_label;
+  ToolTipComboBox* m_imgui_font_combobox;
+  ToolTipComboBox* m_imgui_outline_combobox;
 };

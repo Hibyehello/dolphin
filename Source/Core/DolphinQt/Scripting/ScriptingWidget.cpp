@@ -18,15 +18,15 @@
 #include <QString>
 #include <QStringList>
 #include <QTextEdit>
+#include <QTimer>
 #include <QTreeView>
 #include <QVBoxLayout>
 #include <QWidget>
-#include <QTimer>
 
 #include "Common/FileUtil.h"
 #include "Common/MsgHandler.h"
-#include "Core/Core.h"
 #include "Core/ConfigManager.h"
+#include "Core/Core.h"
 #include "DolphinQt/QtUtils/ModalMessageBox.h"
 #include "DolphinQt/Resources.h"
 #include "DolphinQt/Scripting/ScriptingWidget.h"
@@ -40,6 +40,7 @@ static QSize ICON_SIZE(16, 16);
 ScriptingWidget::ScriptingWidget(QWidget* parent) : QDockWidget(parent)
 {
   setWindowTitle(tr("Scripts"));
+  setObjectName(QStringLiteral("Scripts"));
 
   // actions
   m_button_add_new = new QPushButton();
@@ -54,7 +55,6 @@ ScriptingWidget::ScriptingWidget(QWidget* parent) : QDockWidget(parent)
   actions_layout->addWidget(m_button_open_folder);
   QWidget* actions_widget = new QWidget;
   actions_widget->setLayout(actions_layout);
-
 
   m_scripts_model = new ScriptsFileSystemModel();
   QModelIndex rootIdx =
@@ -168,8 +168,7 @@ void ScriptingWidget::SetScriptState(std::string file_path, bool activate)
   QModelIndex index = m_scripts_model->index(QString::fromStdString(file_path));
   if (!index.isValid() || m_scripts_model->hasChildren(index))
     return;
-  m_scripts_model->setData(index, activate ? Qt::Checked : Qt::Unchecked,
-                           Qt::CheckStateRole);
+  m_scripts_model->setData(index, activate ? Qt::Checked : Qt::Unchecked, Qt::CheckStateRole);
   m_scripts_model->dataChanged(index, index, QList<int>(Qt::CheckStateRole));
 }
 
@@ -217,7 +216,7 @@ void ScriptingWidget::OnEmulationStateChanged(Core::State state)
 
     if (!QDir(QString::fromStdString(path)).exists())
       return;
-    
+
     QModelIndex rootIdx = m_scripts_model->setRootPath(QString::fromStdString(path));
     m_tree->setRootIndex(rootIdx);
 
@@ -239,7 +238,7 @@ void ScriptingWidget::OnEmulationStateChanged(Core::State state)
   }
   default:
     break;
-  }  
+  }
 }
 
 void ScriptingWidget::OnDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight,

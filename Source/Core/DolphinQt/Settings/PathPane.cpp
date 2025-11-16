@@ -206,10 +206,7 @@ QGridLayout* PathPane::MakePathsLayout()
   layout->addWidget(m_load_edit, 3, 1);
   layout->addWidget(load_open, 3, 2);
 
-  m_script_edit = new QLineEdit(QString::fromStdString(File::GetUserPath(D_SCRIPTS_IDX)));
-  connect(m_script_edit, &QLineEdit::editingFinished, [this] {
-    Config::SetBase(Config::MAIN_SCRIPT_PATH, m_script_edit->text().toStdString());
-  });
+  m_script_edit = new ConfigUserPath(D_SCRIPTS_IDX, Config::MAIN_SCRIPT_PATH);
   QPushButton* script_open = new NonDefaultQPushButton(QStringLiteral("..."));
   connect(script_open, &QPushButton::clicked, this, &PathPane::BrowseScript);
   layout->addWidget(new QLabel(tr("Script Path:")), 4, 0);

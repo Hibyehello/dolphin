@@ -3,17 +3,23 @@
 
 #include "DolphinQt/Settings/OnScreenDisplayPane.h"
 
+#include <QFormLayout>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
+#include <QSlider>
 #include <QVBoxLayout>
 #include <QWidget>
+
+#include "Common/FileSearch.h"
+#include "Common/FileUtil.h"
 
 #include "Core/Config/GraphicsSettings.h"
 #include "Core/Config/MainSettings.h"
 
 #include "DolphinQt/Config/ConfigControls/ConfigBool.h"
 #include "DolphinQt/Config/ConfigControls/ConfigInteger.h"
+#include "DolphinQt/Config/ToolTipControls/ToolTipComboBox.h"
 
 OnScreenDisplayPane::OnScreenDisplayPane(QWidget* parent) : QWidget(parent)
 {
@@ -105,6 +111,48 @@ void OnScreenDisplayPane::CreateLayout()
   debug_layout->addWidget(m_show_statistics, 0, 0);
   debug_layout->addWidget(m_show_proj_statistics, 0, 1);
 
+  auto* imgui_groupbox = new QGroupBox(tr("PyCore"));
+  auto* imgui_config_layout = new QFormLayout;
+  imgui_config_layout->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
+  imgui_config_layout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+  m_imgui_font_label =
+      new QLabel(tr("Font Size (%1 px): ").arg(Config::Get(Config::MAIN_IMGUI_FONT_SIZE)));
+  imgui_groupbox->setLayout(imgui_config_layout);
+
+  m_imgui_font_size_slider = new QSlider(Qt::Horizontal);
+  m_imgui_font_size_slider->setRange(8, 40);
+  m_imgui_font_size_slider->setValue(Config::Get(Config::MAIN_IMGUI_FONT_SIZE));
+
+  m_imgui_font_combobox = new ToolTipComboBox;
+  m_imgui_font_combobox->addItem(tr("Default"));
+
+  // Search Fonts
+  auto font_search_results = Common::DoFileSearch({File::GetUserPath(D_LOAD_IDX) + "Fonts"});
+  for (const std::string& path : font_search_results)
+  {
+    const QString qt_name = QString::fromStdString(PathToFileName(path));
+    m_imgui_font_combobox->addItem(qt_name);
+  }
+
+  int index =
+      m_imgui_font_combobox->findText(QString::fromStdString(Config::Get(Config::MAIN_IMGUI_FONT)));
+  if (index != -1)
+  {
+    m_imgui_font_combobox->setCurrentIndex(index);
+  }
+
+  m_imgui_outline_combobox = new ToolTipComboBox;
+  m_imgui_outline_combobox->addItem(tr("None"));
+  m_imgui_outline_combobox->addItem(tr("Partial Quality (thin)"));
+  m_imgui_outline_combobox->addItem(tr("Partial Quality (thick)"));
+  m_imgui_outline_combobox->addItem(tr("Full Quality"));
+  m_imgui_outline_combobox->setCurrentIndex(
+      static_cast<int>(Config::Get(Config::MAIN_IMGUI_OUTLINE_RES)));
+
+  imgui_config_layout->addRow(tr("Font: "), m_imgui_font_combobox);
+  imgui_config_layout->addRow(m_imgui_font_label, m_imgui_font_size_slider);
+  imgui_config_layout->addRow(tr("Outline Resolution: "), m_imgui_outline_combobox);
+
   // Stack GroupBoxes
   auto* main_layout = new QVBoxLayout;
   main_layout->addWidget(general_box);
@@ -112,6 +160,7 @@ void OnScreenDisplayPane::CreateLayout()
   main_layout->addWidget(movie_box);
   main_layout->addWidget(netplay_box);
   main_layout->addWidget(debug_box);
+  main_layout->addWidget(imgui_groupbox);
   main_layout->addStretch();
   setLayout(main_layout);
 }
@@ -138,6 +187,22 @@ void OnScreenDisplayPane::ConnectLayout()
   enable_movie_items(m_movie_window->isChecked());
   connect(m_movie_window, &QCheckBox::toggled, this, [this, enable_movie_items](bool checked) {
     enable_movie_items(m_movie_window->isChecked());
+  });
+
+  connect(m_imgui_font_size_slider, &QSlider::valueChanged, [this](int font_size) {
+    Config::SetBaseOrCurrent(Config::MAIN_IMGUI_FONT_SIZE, font_size);
+    m_imgui_font_label->setText(
+        tr("Font Size (%1 px): ").arg(Config::Get(Config::MAIN_IMGUI_FONT_SIZE)));
+  });
+  connect(m_imgui_font_combobox, &QComboBox::currentIndexChanged, this, [this](int index) {
+    Config::SetBaseOrCurrent(Config::MAIN_IMGUI_FONT,
+                             m_imgui_font_combobox->itemText(index).toStdString());
+  });
+
+  connect(m_imgui_outline_combobox, &QComboBox::currentIndexChanged, this, [this](int index) {
+    Config::SetBaseOrCurrent(
+        Config::MAIN_IMGUI_OUTLINE_RES,
+        static_cast<Config::OutlineRes>(m_imgui_outline_combobox->currentIndex()));
   });
 }
 
@@ -223,6 +288,10 @@ void OnScreenDisplayPane::AddDescriptions()
   static const char TR_SHOW_PROJ_STATS_DESCRIPTION[] =
       QT_TR_NOOP("Shows various projection statistics.<br><br><dolphin_emphasis>If unsure, "
                  "leave this unchecked.</dolphin_emphasis>");
+  static const char TR_PYCORE_IMGUI_FONT_DESCRIPTION[] = QT_TR_NOOP(
+      "Change the font that on screen text uses to help improve readability.</dolphin_emphasis>");
+  static const char TR_PYCORE_IMGUI_FONT_OUTLINE_DESCRIPTION[] = QT_TR_NOOP(
+      "Add an outline to the on screen text to help imrpove readability.</dolphin_emphasis>");
 
   m_enable_osd->SetDescription(tr(TR_ENABLE_OSD_DESCRIPTION));
   m_font_size->SetDescription(tr(TR_OSD_FONT_SIZE_DESCRIPTION));
@@ -248,4 +317,9 @@ void OnScreenDisplayPane::AddDescriptions()
 
   m_show_statistics->SetDescription(tr(TR_SHOW_STATS_DESCRIPTION));
   m_show_proj_statistics->SetDescription(tr(TR_SHOW_PROJ_STATS_DESCRIPTION));
+
+  m_imgui_font_combobox->SetTitle(tr("Font"));
+  m_imgui_font_combobox->SetDescription(tr(TR_PYCORE_IMGUI_FONT_DESCRIPTION));
+  m_imgui_outline_combobox->SetTitle(tr("Font Outline"));
+  m_imgui_outline_combobox->SetDescription(tr(TR_PYCORE_IMGUI_FONT_OUTLINE_DESCRIPTION));
 }
