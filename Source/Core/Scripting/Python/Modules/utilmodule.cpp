@@ -9,6 +9,7 @@
 #include "Core/Core.h"
 #include "Core/ConfigManager.h"
 #include "Core/Host.h"
+#include "Core/Movie.h"
 #include "Core/System.h"
 #include "Scripting/Python/PyScriptingBackend.h"
 #include "Scripting/Python/Utils/module.h"
@@ -228,6 +229,12 @@ static PyObject* get_script_id(PyObject* module, PyObject* args)
   return Py_BuildValue("i", (cur_instance->GetScriptId()));
 }
 
+static PyObject* get_frame_count(PyObject* module, PyObject* args)
+{
+  auto& movie = Core::System::GetInstance().GetMovie();
+  return Py_BuildValue("i", (movie.GetCurrentFrame()));
+}
+
 static void setup_file_module(PyObject* module, FileState* state)
 {
   // I don't think we need anything here yet
@@ -258,6 +265,7 @@ PyMODINIT_FUNC PyInit_dol_utils()
                                   {"activate_script", (PyCFunction) activate_script, METH_VARARGS | METH_KEYWORDS, ""},
                                   {"get_script_name", get_script_name, METH_NOARGS, ""},
                                   {"get_script_id", get_script_id, METH_NOARGS, ""},
+                                  {"get_frame_count", get_frame_count, METH_NOARGS, ""},
                                   {nullptr, nullptr, 0, nullptr}};
   static PyModuleDef module_def =
       Py::MakeStatefulModuleDef<FileState, setup_file_module>("dolphin_utils", methods);
