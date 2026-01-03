@@ -113,3 +113,6 @@ def get_script_name() -> str:
 	
 def get_script_id() -> int:
 	"""Return the id of the current script"""
+     
+def get_frame_count() -> int:
+    """Return the framecount since game boot"""
