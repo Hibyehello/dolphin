@@ -7,6 +7,7 @@
 #include "Core/API/Events.h"
 #include "Core/Config/MainSettings.h"
 #include "Core/Config/GraphicsSettings.h"
+#include "Core/Config/MainSettings.h"
 #include "Core/CoreTiming.h"
 #include "Core/HW/VideoInterface.h"
 #include "Core/Core.h"
@@ -98,8 +99,13 @@ static void TryToSnapToXFBSize(int& width, int& height, int xfb_width, int xfb_h
 
 Presenter::Presenter()
 {
+  auto& video_events = GetVideoEvents();
+
   m_config_changed =
-      GetVideoEvents().config_changed_event.Register([this](u32 bits) { ConfigChanged(bits); });
+      video_events.config_changed_event.Register([this](u32 bits) { ConfigChanged(bits); });
+
+  m_end_field_hook = video_events.vi_end_field_event.Register(
+      [this] { m_immediate_swap_happened_this_field.store(false, std::memory_order_relaxed); });
 }
 
 Presenter::~Presenter()
@@ -111,6 +117,8 @@ Presenter::~Presenter()
 bool Presenter::Initialize()
 {
   UpdateDrawRectangle();
+
+  m_immediate_swap_happened_this_field.store(false, std::memory_order_relaxed);
 
   if (!g_gfx->IsHeadless())
   {
@@ -166,9 +174,12 @@ void Presenter::ViSwap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height,
 {
   bool is_duplicate = FetchXFB(xfb_addr, fb_width, fb_stride, fb_height, ticks);
 
-  PresentInfo present_info;
-  present_info.emulated_timestamp = ticks;
-  present_info.present_count = m_present_count++;
+  PresentInfo present_info{
+      .present_count = m_present_count++,
+      .emulated_timestamp = ticks,
+      .intended_present_time = presentation_time,
+  };
+
   if (is_duplicate)
   {
     present_info.frame_count = m_frame_count - 1;  // Previous frame
@@ -205,33 +216,47 @@ void Presenter::ViSwap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height,
 
   if (!is_duplicate || !g_ActiveConfig.bSkipPresentingDuplicateXFBs)
   {
-    if (!Config::Get(Config::MAIN_REMOVE_UI_DELAY))
-      Present(presentation_time);
+    Present(&present_info);
     ProcessFrameDumping(ticks);
 
     video_events.after_present_event.Trigger(present_info);
   }
 }
 
-void Presenter::ImmediateSwap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height, u64 ticks)
+void Presenter::ImmediateSwap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height)
 {
+  if (m_immediate_swap_happened_this_field.exchange(true, std::memory_order_relaxed) &&
+      Config::Get(Config::GFX_HACK_CAP_IMMEDIATE_XFB))
+  {
+    return;
+  }
+
+  const u64 ticks = m_next_swap_estimated_ticks;
+
   FetchXFB(xfb_addr, fb_width, fb_stride, fb_height, ticks);
 
-  PresentInfo present_info;
-  present_info.emulated_timestamp = ticks;  // TODO: This should be the time of the next VI field
-  present_info.frame_count = m_frame_count++;
-  present_info.reason = PresentInfo::PresentReason::Immediate;
-  present_info.present_count = m_present_count++;
+  PresentInfo present_info{
+      .frame_count = m_frame_count++,
+      .present_count = m_present_count++,
+      .reason = PresentInfo::PresentReason::Immediate,
+      .emulated_timestamp = ticks,
+      .intended_present_time = m_next_swap_estimated_time,
+  };
 
   auto& video_events = GetVideoEvents();
 
   video_events.before_present_event.Trigger(present_info);
 
-  if (!Config::Get(Config::MAIN_REMOVE_UI_DELAY))
-    Present();
+  Present(&present_info);
   ProcessFrameDumping(ticks);
 
   video_events.after_present_event.Trigger(present_info);
+}
+
+void Presenter::SetNextSwapEstimatedTime(u64 ticks, TimePoint host_time)
+{
+  m_next_swap_estimated_ticks = ticks;
+  m_next_swap_estimated_time = host_time;
 }
 
 void Presenter::ProcessFrameDumping(u64 ticks) const
@@ -837,7 +862,7 @@ void Presenter::RenderXFBToScreen(const MathUtil::Rectangle<int>& target_rc,
   }
 }
 
-void Presenter::Present(std::optional<TimePoint> presentation_time)
+void Presenter::Present(PresentInfo* present_info)
 {
   API::GetEventHub().EmitEvent(API::Events::FramePresent{});
 
@@ -893,8 +918,16 @@ void Presenter::Present(std::optional<TimePoint> presentation_time)
   {
     std::lock_guard<std::mutex> guard(m_swap_mutex);
 
-    if (presentation_time.has_value())
-      Core::System::GetInstance().GetCoreTiming().SleepUntil(*presentation_time);
+    if (present_info != nullptr)
+    {
+      const auto present_time = GetUpdatedPresentationTime(present_info->intended_present_time);
+
+      Core::System::GetInstance().GetCoreTiming().SleepUntil(present_time);
+
+      // Perhaps in the future a more accurate time can be acquired from the various backends.
+      present_info->actual_present_time = Clock::now();
+      present_info->present_time_accuracy = PresentInfo::PresentTimeAccuracy::PresentInProgress;
+    }
 
     g_gfx->PresentBackbuffer();
   }
@@ -910,6 +943,34 @@ void Presenter::Present(std::optional<TimePoint> presentation_time)
     m_onscreen_ui->BeginImGuiFrame(m_backbuffer_width, m_backbuffer_height);
   
   g_gfx->EndUtilityDrawing();
+}
+
+TimePoint Presenter::GetUpdatedPresentationTime(TimePoint intended_presentation_time)
+{
+  const auto now = Clock::now();
+  const auto arrival_offset = std::min(now - intended_presentation_time, DT{});
+
+  if (!Config::Get(Config::MAIN_SMOOTH_EARLY_PRESENTATION))
+  {
+    m_presentation_time_offset = arrival_offset;
+
+    // When SmoothEarlyPresentation is off and ImmediateXFB or RushFramePresentation are on,
+    //  present as soon as possible as the goal is to achieve low input latency.
+    if (g_ActiveConfig.bImmediateXFB || Config::Get(Config::MAIN_RUSH_FRAME_PRESENTATION))
+      return now;
+
+    return intended_presentation_time;
+  }
+
+  // Adjust slowly backward in time but quickly forward in time.
+  // This keeps the pacing moderately smooth even if games produce regular sporadic bumps.
+  // This was tuned to handle the terrible pacing in Brawl with "Immediate XFB".
+  // Super Mario Galaxy 1 + 2 still perform poorly here in SingleCore mode.
+  const auto adjustment_divisor = (arrival_offset < m_presentation_time_offset) ? 100 : 2;
+
+  m_presentation_time_offset += (arrival_offset - m_presentation_time_offset) / adjustment_divisor;
+
+  return intended_presentation_time + m_presentation_time_offset;
 }
 
 void Presenter::SetKeyMap(const DolphinKeyMap& key_map)
@@ -951,8 +1012,12 @@ void Presenter::DoState(PointerWrap& p)
     // This technically counts as the end of the frame
     GetVideoEvents().after_frame_event.Trigger(Core::System::GetInstance());
 
-    ImmediateSwap(m_last_xfb_addr, m_last_xfb_width, m_last_xfb_stride, m_last_xfb_height,
-                  m_last_xfb_ticks);
+    m_next_swap_estimated_ticks = m_last_xfb_ticks;
+    m_next_swap_estimated_time = Clock::now();
+
+    m_immediate_swap_happened_this_field.store(false, std::memory_order_relaxed);
+
+    ImmediateSwap(m_last_xfb_addr, m_last_xfb_width, m_last_xfb_stride, m_last_xfb_height);
   }
 }
 

@@ -16,7 +16,7 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 
-if (LINUX AND Qt6_VERSION VERSION_GREATER_EQUAL 6.10.0)
+if (Qt6_VERSION VERSION_GREATER_EQUAL 6.10.0)
   # GuiPrivate is needed to #include qplatformnativeinterface.h in MainWindow.cpp with Qt 6.10+.
   set(NEED_QT_GUI_PRIVATE_COMPONENT ON)
   find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
@@ -266,6 +266,8 @@ add_executable(dolphin-emu
   DiscordJoinRequestDialog.h
   EmulatedUSB/WiiSpeakWindow.cpp
   EmulatedUSB/WiiSpeakWindow.h
+  EmulatedUSB/LogitechMicWindow.cpp
+  EmulatedUSB/LogitechMicWindow.h
   FIFO/FIFOAnalyzer.cpp
   FIFO/FIFOAnalyzer.h
   FIFO/FIFOPlayerWindow.cpp

@@ -118,6 +118,7 @@ add_library(common
   NandPaths.h
   Network.cpp
   Network.h
+  OneShotEvent.h
   PcapFile.cpp
   PcapFile.h
   Profiler.cpp
@@ -182,7 +183,7 @@ PUBLIC
   enet::enet
   fmt::fmt
   MbedTLS::mbedtls
-  minizip-ng::minizip-ng
+  MINIZIP::minizip-ng
   sfml-network
 
 PRIVATE

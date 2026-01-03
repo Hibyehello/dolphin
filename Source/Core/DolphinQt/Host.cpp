@@ -8,6 +8,7 @@
 #include <QAbstractEventDispatcher>
 #include <QApplication>
 #include <QLocale>
+#include <QThread>
 
 #include <imgui.h>
 
@@ -316,7 +317,8 @@ bool Host_TASInputHasFocus()
 
 void Host_YieldToUI()
 {
-  qApp->processEvents(QEventLoop::ExcludeUserInputEvents);
+  if (qApp->thread() == QThread::currentThread())
+    qApp->processEvents(QEventLoop::ExcludeUserInputEvents);
 }
 
 void Host_UpdateDisasmDialog()

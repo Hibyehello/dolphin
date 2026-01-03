@@ -21,6 +21,8 @@
 #include "Core/Core.h"
 #include "Core/CoreTiming.h"
 #include "Core/DolphinAnalytics.h"
+#include "Core/HW/SystemTimers.h"
+#include "Core/HW/VideoInterface.h"
 #include "Core/System.h"
 
 // TODO: ugly
@@ -41,7 +43,6 @@
 #endif
 
 #include "VideoCommon/AbstractGfx.h"
-#include "VideoCommon/Assets/CustomResourceManager.h"
 #include "VideoCommon/AsyncRequests.h"
 #include "VideoCommon/BPStructs.h"
 #include "VideoCommon/BoundingBox.h"
@@ -57,6 +58,7 @@
 #include "VideoCommon/PixelEngine.h"
 #include "VideoCommon/PixelShaderManager.h"
 #include "VideoCommon/Present.h"
+#include "VideoCommon/Resources/CustomResourceManager.h"
 #include "VideoCommon/TMEM.h"
 #include "VideoCommon/TextureCacheBase.h"
 #include "VideoCommon/VertexLoaderManager.h"
@@ -93,16 +95,35 @@ std::string VideoBackendBase::BadShaderFilename(const char* shader_stage, int co
 void VideoBackendBase::Video_OutputXFB(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height,
                                        u64 ticks)
 {
-  if (m_initialized && g_presenter && !g_ActiveConfig.bImmediateXFB)
+  if (!m_initialized || !g_presenter)
+    return;
+
+  auto& system = Core::System::GetInstance();
+  auto& core_timing = system.GetCoreTiming();
+
+  if (!g_ActiveConfig.bImmediateXFB)
   {
-    auto& system = Core::System::GetInstance();
     system.GetFifo().SyncGPU(Fifo::SyncGPUReason::Swap);
 
-    const TimePoint presentation_time = system.GetCoreTiming().GetTargetHostTime(ticks);
+    const TimePoint presentation_time = core_timing.GetTargetHostTime(ticks);
     AsyncRequests::GetInstance()->PushEvent([=] {
       g_presenter->ViSwap(xfb_addr, fb_width, fb_stride, fb_height, ticks, presentation_time);
     });
   }
+
+  // Inform the Presenter of the next estimated swap time.
+
+  auto& vi = system.GetVideoInterface();
+  const s64 refresh_rate_den = vi.GetTargetRefreshRateDenominator();
+  const s64 refresh_rate_num = vi.GetTargetRefreshRateNumerator();
+
+  const auto next_swap_estimated_ticks =
+      ticks + (system.GetSystemTimers().GetTicksPerSecond() * refresh_rate_den / refresh_rate_num);
+  const auto next_swap_estimated_time = core_timing.GetTargetHostTime(next_swap_estimated_ticks);
+
+  AsyncRequests::GetInstance()->PushEvent([=] {
+    g_presenter->SetNextSwapEstimatedTime(next_swap_estimated_ticks, next_swap_estimated_time);
+  });
 }
 
 u32 VideoBackendBase::Video_GetQueryResult(PerfQueryType type)

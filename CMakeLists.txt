@@ -692,7 +692,7 @@ dolphin_find_optional_system_library_pkgconfig(ZSTD libzstd>=1.4.0 zstd::zstd Ex
 dolphin_find_optional_system_library_pkgconfig(ZLIB zlib>=1.3.1 ZLIB::ZLIB Externals/zlib-ng)
 
 dolphin_find_optional_system_library_pkgconfig(minizip-ng
-  "minizip-ng>=4.0.4" minizip-ng::minizip-ng Externals/minizip-ng
+  "minizip-ng>=4.0.4" MINIZIP::minizip-ng Externals/minizip-ng
 )
 
 dolphin_find_optional_system_library(LZO Externals/LZO)
@@ -758,7 +758,7 @@ if(NOT ENABLE_QT)
   set(USE_MGBA 0)
 endif()
 if(USE_MGBA)
-  dolphin_find_optional_system_library(LIBMGBA Externals/mGBA)
+  dolphin_find_optional_system_library(LIBMGBA Externals/mGBA 0.11)
 endif()
 
 find_package(SYSTEMD)
@@ -788,7 +788,7 @@ endif()
 
 add_subdirectory(Externals/watcher)
 
-if(WIN32 OR LINUX)
+if(NOT ANDROID AND NOT APPLE)
   add_subdirectory(Externals/cpp-ipc)
 endif()
 

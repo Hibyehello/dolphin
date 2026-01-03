@@ -65,7 +65,10 @@ extern const Info<bool> MAIN_DSP_HLE;
 extern const Info<int> MAIN_MAX_FALLBACK;
 extern const Info<int> MAIN_TIMING_VARIANCE;
 extern const Info<bool> MAIN_CORRECT_TIME_DRIFT;
+extern const Info<bool> MAIN_RUSH_FRAME_PRESENTATION;
+extern const Info<bool> MAIN_SMOOTH_EARLY_PRESENTATION;
 extern const Info<bool> MAIN_CPU_THREAD;
+extern const Info<bool> MAIN_LOAD_GAME_INTO_MEMORY;
 extern const Info<bool> MAIN_SYNC_ON_SKIP_IDLE;
 extern const Info<std::string> MAIN_DEFAULT_ISO;
 extern const Info<bool> MAIN_ENABLE_CHEATS;
@@ -387,6 +390,14 @@ extern const Info<bool> MAIN_EMULATE_WII_SPEAK;
 extern const Info<std::string> MAIN_WII_SPEAK_MICROPHONE;
 extern const Info<bool> MAIN_WII_SPEAK_MUTED;
 extern const Info<s16> MAIN_WII_SPEAK_VOLUME_MODIFIER;
+
+static constexpr std::size_t EMULATED_LOGITECH_MIC_COUNT = 4;
+
+extern const std::array<Info<bool>, EMULATED_LOGITECH_MIC_COUNT> MAIN_EMULATE_LOGITECH_MIC;
+extern const std::array<Info<std::string>, EMULATED_LOGITECH_MIC_COUNT>
+    MAIN_LOGITECH_MIC_MICROPHONE;
+extern const std::array<Info<bool>, EMULATED_LOGITECH_MIC_COUNT> MAIN_LOGITECH_MIC_MUTED;
+extern const std::array<Info<s16>, EMULATED_LOGITECH_MIC_COUNT> MAIN_LOGITECH_MIC_VOLUME_MODIFIER;
 
 // GameCube path utility functions
 
