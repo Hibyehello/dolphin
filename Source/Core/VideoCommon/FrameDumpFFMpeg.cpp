@@ -115,7 +115,7 @@ void InitAVCodec()
 
     const AVCodec* codec = nullptr;
     void* i = 0;
-    while(codec = av_codec_iterate(&i))
+    while((codec = av_codec_iterate(&i)))
     {
       if(av_codec_is_encoder(codec))
         INFO_LOG_FMT(FRAMEDUMP, "codec: {} and {}", codec->long_name, codec->name);
@@ -123,7 +123,7 @@ void InitAVCodec()
 
     const AVOutputFormat* oformat = nullptr;
     i = 0;
-    while(oformat = av_muxer_iterate(&i))
+    while((oformat = av_muxer_iterate(&i)))
     {
         INFO_LOG_FMT(FRAMEDUMP, "format: {} and {}", oformat->long_name, oformat->name);
     }
