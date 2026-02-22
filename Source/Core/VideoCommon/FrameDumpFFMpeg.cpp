@@ -113,6 +113,22 @@ void InitAVCodec()
       }
     });
 
+    av_register_all();
+
+    AVCodec* codec = av_codec_next(NULL);
+    while(codec != NULL)
+    {
+        INFO_LOG_FMT(Common::Log::LogType::FRAMEDUMP, "codec: {} and {}", codec->long_name, codec->name);
+        codec = av_codec_next(codec);
+    }
+
+    AVOutputFormat* oformat = av_oformat_next(NULL);
+    while(oformat != NULL)
+    {
+        INFO_LOG_FMT(Common::Log::LogType::FRAMEDUMP, "format: {} and {}" oformat->long_name, oformat->name);
+        oformat = av_oformat_next(oformat);
+    }
+
     // TODO: We never call avformat_network_deinit.
     avformat_network_init();
 
