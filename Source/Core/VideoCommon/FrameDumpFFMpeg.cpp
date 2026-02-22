@@ -113,9 +113,7 @@ void InitAVCodec()
       }
     });
 
-    av_register_all();
-
-    AVCodec* codec = nullptr;
+    const AVCodec* codec = nullptr;
     void* i = 0;
     while(codec = av_codec_iterate(&i))
     {
@@ -123,7 +121,7 @@ void InitAVCodec()
         INFO_LOG_FMT(FRAMEDUMP, "codec: {} and {}", codec->long_name, codec->name);
     }
 
-    AVOutputFormat* oformat = nullptr;
+    const AVOutputFormat* oformat = nullptr;
     i = 0;
     while(oformat = av_muxer_iterate(&i))
     {
