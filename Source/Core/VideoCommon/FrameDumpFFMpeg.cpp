@@ -125,7 +125,7 @@ void InitAVCodec()
     AVOutputFormat* oformat = av_oformat_next(NULL);
     while(oformat != NULL)
     {
-        INFO_LOG_FMT(Common::Log::LogType::FRAMEDUMP, "format: {} and {}" oformat->long_name, oformat->name);
+        INFO_LOG_FMT(Common::Log::LogType::FRAMEDUMP, "format: {} and {}", oformat->long_name, oformat->name);
         oformat = av_oformat_next(oformat);
     }
 
