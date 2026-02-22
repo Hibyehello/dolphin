@@ -115,18 +115,19 @@ void InitAVCodec()
 
     av_register_all();
 
-    AVCodec* codec = av_codec_next(NULL);
-    while(codec != NULL)
+    AVCodec* codec = nullptr;
+    void* i = 0;
+    while(codec = av_codec_iterate(&i))
     {
-        INFO_LOG_FMT(Common::Log::LogType::FRAMEDUMP, "codec: {} and {}", codec->long_name, codec->name);
-        codec = av_codec_next(codec);
+      if(av_codec_is_encoder(codec))
+        INFO_LOG_FMT(FRAMEDUMP, "codec: {} and {}", codec->long_name, codec->name);
     }
 
-    AVOutputFormat* oformat = av_oformat_next(NULL);
-    while(oformat != NULL)
+    AVOutputFormat* oformat = nullptr;
+    i = 0;
+    while(oformat = av_muxer_iterate(&i))
     {
-        INFO_LOG_FMT(Common::Log::LogType::FRAMEDUMP, "format: {} and {}", oformat->long_name, oformat->name);
-        oformat = av_oformat_next(oformat);
+        INFO_LOG_FMT(FRAMEDUMP, "format: {} and {}", oformat->long_name, oformat->name);
     }
 
     // TODO: We never call avformat_network_deinit.
