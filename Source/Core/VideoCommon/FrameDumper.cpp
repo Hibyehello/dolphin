@@ -27,16 +27,16 @@ static bool DumpFrameToPNG(const FrameData& frame, const std::string& file_name)
                                             Config::Get(Config::GFX_PNG_COMPRESSION_LEVEL));
 }
 
-FrameDumper::FrameDumper()
-{
-  m_frame_end_handle =
-      GetVideoEvents().after_frame_event.Register([this](Core::System&) { FlushFrameDump(); });
-}
-
-FrameDumper::~FrameDumper()
-{
-  ShutdownFrameDumping();
-}
+// FrameDumper::FrameDumper()
+// {
+//   m_frame_end_handle =
+//       GetVideoEvents().after_frame_event.Register([this](Core::System&) { FlushFrameDump(); });
+// }
+//
+// FrameDumper::~FrameDumper()
+// {
+//   ShutdownFrameDumping();
+// }
 
 void FrameDumper::DumpCurrentFrame(const AbstractTexture* src_texture,
                                    const MathUtil::Rectangle<int>& src_rect,
@@ -68,6 +68,16 @@ void FrameDumper::DumpCurrentFrame(const AbstractTexture* src_texture,
                                                  m_frame_dump_readback_texture->GetRect());
   m_last_frame_state = m_ffmpeg_dump.FetchState(ticks, frame_number);
   m_frame_dump_needs_flush = true;
+
+  std::swap(m_frame_dump_readback_texture, m_frame_dump_output_texture);
+
+  auto& output = m_frame_dump_output_texture;
+  output->Flush();
+
+  if (output->Map())
+  {
+    DumpFrameData(reinterpret_cast<u8*>(output->GetMappedPointer()), output->GetConfig().width, output->GetConfig().height, static_cast<int>(output->GetMappedStride()));
+  }
 }
 
 bool FrameDumper::CheckFrameDumpRenderTexture(u32 target_width, u32 target_height)
@@ -172,17 +182,20 @@ void FrameDumper::DumpFrameData(const u8* data, int w, int h, int stride)
 {
   m_frame_dump_data = FrameData{data, w, h, stride, m_last_frame_state};
 
-  if (!m_frame_dump_thread_running.IsSet())
+  if (Config::Get(Config::MAIN_MOVIE_DUMP_FRAMES))
   {
-    if (m_frame_dump_thread.joinable())
-      m_frame_dump_thread.join();
-    m_frame_dump_thread_running.Set();
-    m_frame_dump_thread = std::thread(&FrameDumper::FrameDumpThreadFunc, this);
-  }
+    if (!mLastFrameDumped)
+    {
+      mIsAVIDumping = m_ffmpeg_dump.Start(w, h, m_last_frame_state.ticks);
+    }
 
-  // Wake worker thread up.
-  m_frame_dump_start.Set();
-  m_frame_dump_frame_running = true;
+    if (mIsAVIDumping)
+    {
+      m_ffmpeg_dump.AddFrame(m_frame_dump_data);
+    }
+
+    mLastFrameDumped = true;
+  }
 }
 
 void FrameDumper::FinishFrameData()
@@ -345,13 +358,22 @@ void FrameDumper::SaveScreenshot(std::string filename)
   m_screenshot_request.Set();
 }
 
-bool FrameDumper::IsFrameDumping() const
+bool FrameDumper::IsFrameDumping()
 {
   if (m_screenshot_request.IsSet())
     return true;
 
   if (Config::Get(Config::MAIN_MOVIE_DUMP_FRAMES))
     return true;
+
+  if (mIsAVIDumping && mLastFrameDumped)
+  {
+    m_ffmpeg_dump.Stop();
+    mIsAVIDumping = false;
+    OSD::AddMessage("Stopped dumping frames");
+  }
+
+  mLastFrameDumped = false;
 
   return false;
 }

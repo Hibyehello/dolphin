@@ -38,6 +38,7 @@ extern "C" {
 #include "Core/HW/SystemTimers.h"
 #include "Core/HW/VideoInterface.h"
 #include "Core/System.h"
+#include "Core/CoreTiming.h"
 
 #include "VideoCommon/OnScreenDisplay.h"
 
@@ -356,6 +357,10 @@ bool FFMpegFrameDump::IsFirstFrameInCurrentFile() const
 
 void FFMpegFrameDump::AddFrame(const FrameData& frame)
 {
+
+  auto& system = Core::System::GetInstance();
+  SystemTimers::SystemTimersManager& systemTimers = system.GetSystemTimers();
+  CoreTiming::CoreTimingManager& coreTiming = system.GetCoreTiming();
   // Are we even dumping?
   if (!IsStarted())
     return;
@@ -370,8 +375,11 @@ void FFMpegFrameDump::AddFrame(const FrameData& frame)
   const s64 pts = av_rescale_q(
       frame.state.ticks - m_context->start_ticks,
       // TODO: GetTicksPerSecond is not safe from GPU thread.
-      AVRational{1, int(Core::System::GetInstance().GetSystemTimers().GetTicksPerSecond())},
+      AVRational{1, int(systemTimers.GetTicksPerSecond())},
       m_context->codec->time_base);
+
+  INFO_LOG_FMT(FRAMEDUMP, "Last PTS: {} | PTS: {} | Stream PTS: {}", m_context->last_pts, pts, m_context->scaled_frame->pts);
+  INFO_LOG_FMT(FRAMEDUMP, "Ticks: {} | Ticks per Second: {}", coreTiming.GetTicks(), systemTimers.GetTicksPerSecond());
 
   if (!IsFirstFrameInCurrentFile())
   {
@@ -384,7 +392,7 @@ void FFMpegFrameDump::AddFrame(const FrameData& frame)
     {
       WARN_LOG_FMT(FRAMEDUMP, "PTS delta > 1. Resulting file will have variable frame rate. "
                               "Subsequent occurrences will not be reported.");
-      m_context->gave_vfr_warning = true;
+      // m_context->gave_vfr_warning = true;
     }
   }
 

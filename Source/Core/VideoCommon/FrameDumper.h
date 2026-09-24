@@ -19,8 +19,8 @@ class AbstractFramebuffer;
 class FrameDumper
 {
 public:
-  FrameDumper();
-  ~FrameDumper();
+  // FrameDumper();
+  // ~FrameDumper();
 
   // Ensures all rendered frames are queued for encoding.
   void FlushFrameDump();
@@ -32,10 +32,13 @@ public:
 
   void SaveScreenshot(std::string filename);
 
-  bool IsFrameDumping() const;
+  bool IsFrameDumping();
   int GetRequiredResolutionLeastCommonMultiple() const;
 
   void DoState(PointerWrap& p);
+
+  bool mLastFrameDumped = false;
+  bool mIsAVIDumping = false;
 
 private:
   // NOTE: The methods below are called on the framedumping thread.
