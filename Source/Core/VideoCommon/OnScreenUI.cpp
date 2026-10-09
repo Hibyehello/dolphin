@@ -6,6 +6,7 @@
 #include "Common/CommonPaths.h"
 #include "Common/EnumMap.h"
 #include "Common/FileUtil.h"
+#include "Common/Logging/Log.h"
 #include "Common/Profiler.h"
 #include "Common/Timer.h"
 
@@ -29,17 +30,20 @@
 #include "VideoCommon/Present.h"
 #include "VideoCommon/Statistics.h"
 #include "VideoCommon/VertexManagerBase.h"
+#include "VideoCommon/VideoBackendBase.h"
 #include "VideoCommon/VideoConfig.h"
 
 #include <inttypes.h>
 #include <mutex>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <implot.h>
 
 namespace VideoCommon
 {
-bool OnScreenUI::Initialize(u32 width, u32 height, float scale)
+
+bool OnScreenUI::Initialize(u32 width, u32 height, float scale, void (*imgui_setup)(void*, void*), void* window_handle)
 {
   std::unique_lock<std::mutex> imgui_lock(m_imgui_mutex);
 
@@ -97,7 +101,33 @@ bool OnScreenUI::Initialize(u32 width, u32 height, float scale)
   }
 
   // Setup new font management behavior
-  io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset;
+  io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset | ImGuiBackendFlags_RendererHasViewports;
+  io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable | ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_DpiEnableScaleViewports;
+
+  if(imgui_setup)
+    imgui_setup(window_handle, this);
+
+  ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+  platform_io.Renderer_CreateWindow = [](ImGuiViewport* vp) {
+    ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+    OnScreenUI* onscreen_ui = reinterpret_cast<OnScreenUI*>(main_viewport->PlatformUserData);
+    onscreen_ui->OnScreenUI_CreateWindow(vp);
+  };
+  platform_io.Renderer_DestroyWindow = [](ImGuiViewport* vp) {
+    ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+    OnScreenUI* onscreen_ui = reinterpret_cast<OnScreenUI*>(main_viewport->PlatformUserData);
+    onscreen_ui->OnScreenUI_DestroyWindow(vp);
+  };
+  platform_io.Renderer_SetWindowSize = [](ImGuiViewport* vp, ImVec2 size) {
+    ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+    OnScreenUI* onscreen_ui = reinterpret_cast<OnScreenUI*>(main_viewport->PlatformUserData);
+    onscreen_ui->OnScreenUI_SetWindowSize(vp, size);
+  };
+  platform_io.Renderer_RenderWindow = [](ImGuiViewport* vp, void*) {
+    ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+    OnScreenUI* onscreen_ui = reinterpret_cast<OnScreenUI*>(main_viewport->PlatformUserData);
+    onscreen_ui->OnScreenUI_RenderWindow(vp, nullptr);
+  };
 
   if (!RecompileImGuiPipeline())
     return false;
@@ -115,6 +145,7 @@ OnScreenUI::~OnScreenUI()
 
   ImGui::EndFrame();
   ImPlot::DestroyContext();
+  ImGui::DestroyPlatformWindows();
   ImGui::DestroyContext();
   m_imgui_textures.clear();
 }
@@ -193,39 +224,49 @@ void OnScreenUI::BeginImGuiFrame(u32 width, u32 height)
 
 void OnScreenUI::BeginImGuiFrameUnlocked(u32 width, u32 height)
 {
-  m_backbuffer_width = width;
-  m_backbuffer_height = height;
-
   const u64 current_time_us = Common::Timer::NowUs();
   const u64 time_diff_us = current_time_us - m_imgui_last_frame_time;
   const float time_diff_secs = static_cast<float>(time_diff_us / 1000000.0);
   m_imgui_last_frame_time = current_time_us;
 
+  ImGuiViewport* main_viewport = ImGui::GetMainViewport();
   // Update I/O with window dimensions.
   ImGuiIO& io = ImGui::GetIO();
-  io.DisplaySize =
-      ImVec2(static_cast<float>(m_backbuffer_width), static_cast<float>(m_backbuffer_height));
+  io.DisplaySize = main_viewport->Size;
+  //float scale = main_viewport->DpiScale > 0.0f ? main_viewport->DpiScale : 1.0f;
+  //io.DisplayFramebufferScale = ImVec2{ scale, scale};
   io.DeltaTime = time_diff_secs;
 
+  m_backbuffer_width = width;
+  m_backbuffer_height = height;
+
   ImGui::NewFrame();
+
+  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
+  ImGui::PushStyleColor(ImGuiCol_DockingEmptyBg, ImVec4(0, 0, 0, 0));
+  ImGui::DockSpaceOverViewport(ImGuiDockNodeFlags_PassthruCentralNode, ImGui::GetMainViewport());
+  ImGui::PopStyleColor(2);
 }
 
-void OnScreenUI::DrawImGui()
+void OnScreenUI::DrawImGui(ImDrawData* draw_data)
 {
-  ImDrawData* draw_data = ImGui::GetDrawData();
   if (!draw_data)
     return;
 
-  g_gfx->SetViewport(0.0f, 0.0f, static_cast<float>(m_backbuffer_width),
-                     static_cast<float>(m_backbuffer_height), 0.0f, 1.0f);
+  float backbuffer_width = draw_data->DisplaySize.x * draw_data->FramebufferScale.x;
+  float backbuffer_height = draw_data->DisplaySize.y * draw_data->FramebufferScale.y;
+  ImVec2 display_pos = draw_data->DisplayPos;
+
+  g_gfx->SetViewport(0.0f, 0.0f, backbuffer_width,
+                     backbuffer_height, 0.0f, 1.0f);
 
   // Uniform buffer for draws.
   struct ImGuiUbo
   {
     float u_rcp_viewport_size_mul2[2];
-    float padding[2];
+    float u_display_pos[2];
   };
-  ImGuiUbo ubo = {{1.0f / m_backbuffer_width * 2.0f, 1.0f / m_backbuffer_height * 2.0f}};
+  ImGuiUbo ubo = {{1.0f / draw_data->DisplaySize.x * 2.0f, 1.0f / draw_data->DisplaySize.y * 2.0f}, {display_pos.x, display_pos.y}};
 
   // Set up common state for drawing.
   g_gfx->SetPipeline(m_imgui_pipeline.get());
@@ -236,7 +277,7 @@ void OnScreenUI::DrawImGui()
   {
     const ImDrawList* cmdlist = draw_data->CmdLists[i];
     if (cmdlist->VtxBuffer.empty() || cmdlist->IdxBuffer.empty())
-      return;
+      continue;
 
     u32 base_vertex, base_index;
     g_vertex_manager->UploadUtilityVertices(cmdlist->VtxBuffer.Data, sizeof(ImDrawVert),
@@ -253,8 +294,8 @@ void OnScreenUI::DrawImGui()
 
       g_gfx->SetScissorRect(g_gfx->ConvertFramebufferRectangle(
           MathUtil::Rectangle<int>(
-              static_cast<int>(cmd.ClipRect.x), static_cast<int>(cmd.ClipRect.y),
-              static_cast<int>(cmd.ClipRect.z), static_cast<int>(cmd.ClipRect.w)),
+              static_cast<int>((cmd.ClipRect.x - display_pos.x)*draw_data->FramebufferScale.x), static_cast<int>((cmd.ClipRect.y - display_pos.y)*draw_data->FramebufferScale.y),
+              static_cast<int>((cmd.ClipRect.z - display_pos.x)*draw_data->FramebufferScale.x), static_cast<int>((cmd.ClipRect.w - display_pos.y))*draw_data->FramebufferScale.y),
           g_gfx->GetCurrentFramebuffer()));
       g_gfx->SetTexture(0, reinterpret_cast<const AbstractTexture*>(cmd.GetTexID()));
       g_gfx->DrawIndexed(base_index, cmd.ElemCount, base_vertex);
@@ -268,7 +309,7 @@ void OnScreenUI::DrawImGui()
   // capture whenever any ImGui windows are open. We'll reset the scissor rectangle to the entire
   // viewport here to avoid this problem.
   g_gfx->SetScissorRect(g_gfx->ConvertFramebufferRectangle(
-      MathUtil::Rectangle<int>(0, 0, m_backbuffer_width, m_backbuffer_height),
+      MathUtil::Rectangle<int>(0, 0, backbuffer_width, backbuffer_height),
       g_gfx->GetCurrentFramebuffer()));
 }
 
@@ -279,11 +320,11 @@ void OnScreenUI::DrawDebugText()
   {
     // Position under the FPS display.
     ImGui::SetNextWindowPos(
-        ImVec2(ImGui::GetIO().DisplaySize.x - ImGui::GetFontSize() * m_backbuffer_scale,
-               80.f * m_backbuffer_scale),
+      ImVec2(ImGui::GetMainViewport()->Pos.x - ImGui::GetFontSize(),
+               80.f),
         ImGuiCond_FirstUseEver, ImVec2(1.0f, 0.0f));
-    ImGui::SetNextWindowSizeConstraints(ImVec2(5.0f * ImGui::GetFontSize() * m_backbuffer_scale,
-                                               2.1f * ImGui::GetFontSize() * m_backbuffer_scale),
+    ImGui::SetNextWindowSizeConstraints(ImVec2(5.0f * ImGui::GetFontSize(),
+                                               2.1f * ImGui::GetFontSize()),
                                         ImGui::GetIO().DisplaySize);
     if (ImGui::Begin("Movie", nullptr, ImGuiWindowFlags_NoFocusOnAppearing))
     {
@@ -413,8 +454,10 @@ void OnScreenUI::DrawChallengesAndLeaderboards()
 #endif  // USE_RETRO_ACHIEVEMENTS
 }
 
-void OnScreenUI::Finalize()
+ImDrawData* OnScreenUI::Finalize()
 {
+  ImDrawData* main_window_draw_data;
+  {
   auto lock = GetImGuiLock();
 
   auto& perf_metrics = Core::System::GetInstance().GetPerfMetrics();
@@ -424,6 +467,8 @@ void OnScreenUI::Finalize()
   DrawChallengesAndLeaderboards();
   ImGui::Render();
 
+  main_window_draw_data = ImGui::GetMainViewport()->DrawData;
+
   // Check for font changes
   ImGuiStyle& style = ImGui::GetStyle();
   const int size = Config::Get(Config::MAIN_OSD_FONT_SIZE);
@@ -431,11 +476,23 @@ void OnScreenUI::Finalize()
     style.FontSizeBase = static_cast<float>(size);
 
   // Create or update fonts.
-  ImDrawData* draw_data = ImGui::GetDrawData();
-  if (draw_data->Textures != nullptr)
-    for (ImTextureData* tex : *draw_data->Textures)
+  for (ImTextureData* tex : ImGui::GetPlatformIO().Textures)
+  {
       if (tex->Status != ImTextureStatus_OK)
-        UpdateImguiTexture(tex);
+      {
+          UpdateImguiTexture(tex);
+      }
+  }
+  }
+
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+  {
+      // Synchronizes window state and triggers Platform_* callbacks
+      ImGui::UpdatePlatformWindows();
+  }
+
+  return main_window_draw_data;
 }
 
 void OnScreenUI::UpdateImguiTexture(ImTextureData* tex)
@@ -594,6 +651,69 @@ void OnScreenUI::SetMousePress(u32 button_mask)
   for (size_t i = 0; i < std::size(ImGui::GetIO().MouseDown); i++)
   {
     ImGui::GetIO().AddMouseButtonEvent(static_cast<int>(i), (button_mask & (1u << i)) != 0);
+  }
+}
+
+void OnScreenUI::UpdateMainViewportPos(float x, float y)
+{
+  auto lock = GetImGuiLock();
+
+  ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+
+  main_viewport->Pos = ImVec2{x, y};
+  main_viewport->PlatformRequestMove = true;
+}
+
+void OnScreenUI::UpdateMainViewportSize(u32 width, u32 height, float scale)
+{
+  auto lock = GetImGuiLock();
+
+  ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+
+  main_viewport->Size = ImVec2{static_cast<float>(width), static_cast<float>(height)};
+  main_viewport->DpiScale = scale;
+  main_viewport->PlatformRequestResize = true;
+}
+
+void OnScreenUI::OnScreenUI_CreateWindow(ImGuiViewport *vp)
+{
+  auto* data = new OnScreenUI_ViewportData();
+  vp->RendererUserData = data;
+
+  const float scale = vp->DpiScale > 0.0f ? vp->DpiScale : 1.0f;
+  const u32 width = vp->Size.x * scale;
+  const u32 height = vp->Size.y * scale;
+
+  data->swapchain = g_video_backend->CreateSwapChain(vp->PlatformHandleRaw, width, height);
+}
+
+void OnScreenUI::OnScreenUI_DestroyWindow(ImGuiViewport *vp)
+{
+  if(auto* data = reinterpret_cast<OnScreenUI_ViewportData*>(vp->RendererUserData))
+  {
+    delete data;
+    vp->RendererUserData = nullptr;
+  }
+}
+
+void OnScreenUI::OnScreenUI_SetWindowSize(ImGuiViewport *vp, ImVec2 size)
+{
+  if(auto* data = reinterpret_cast<OnScreenUI_ViewportData*>(vp->RendererUserData)) {
+    const float scale = vp->DpiScale > 0.0f ? vp->DpiScale : 1.0f;
+    data->swapchain->Resize(size.x*scale, size.y*scale, scale);
+  }
+}
+
+void OnScreenUI::OnScreenUI_RenderWindow(ImGuiViewport *vp, void *)
+{
+  if(auto* data = reinterpret_cast<OnScreenUI_ViewportData*>(vp->RendererUserData))
+  {
+    if(data->swapchain->BindBackBuffer())
+    {
+      this->DrawImGui(vp->DrawData);
+      data->swapchain->Present();
+      g_gfx->Flush();
+    }
   }
 }
 

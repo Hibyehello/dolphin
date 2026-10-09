@@ -100,6 +100,7 @@
 #include "DolphinQt/GameList/GameList.h"
 #include "DolphinQt/Host.h"
 #include "DolphinQt/HotkeyScheduler.h"
+#include "DolphinQt/ImguiQtPlatform.h"
 #include "DolphinQt/InfinityBase/InfinityBaseWindow.h"
 #include "DolphinQt/MenuBar.h"
 #include "DolphinQt/NKitWarningDialog.h"
@@ -198,6 +199,8 @@ static WindowSystemInfo GetWindowSystemInfo(QWindow* window)
   wsi.render_surface = wsi.render_window;
 #endif
   wsi.render_surface_scale = window ? static_cast<float>(window->devicePixelRatio()) : 1.0f;
+
+  wsi.SetupImgui = SetupImguiViewport;
 
   return wsi;
 }
@@ -1074,6 +1077,21 @@ bool MainWindow::RequestStop()
 
 void MainWindow::ForceStop()
 {
+  ImGuiViewport* main_vp = ImGui::GetMainViewport();
+  if (main_vp && main_vp->PlatformHandle)
+  {
+      auto* parent_wrapper = static_cast<QWindow*>(main_vp->PlatformHandle);
+
+      // Ensure we're deleting a QWindow pointer, not a raw native handle
+      if (reinterpret_cast<void*>(parent_wrapper) != main_vp->PlatformHandleRaw)
+      {
+          // Safely delete the foreign QWindow C++ wrapper object on the Qt GUI thread.
+          // (Qt's foreign window flag ensures deleting this wrapper will NOT
+          // destroy Dolphin's underlying native OS window).
+          parent_wrapper->deleteLater();
+      }
+      main_vp->PlatformHandle = nullptr;
+  }
   Core::Stop(m_system);
 }
 

@@ -1,6 +1,7 @@
 // Copyright 2022 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#import "VideoBackends/Metal/MTLSwapChain.h"
 #include "VideoBackends/Metal/VideoBackend.h"
 
 // This must be included before we use any TARGET_OS_* macros.
@@ -50,6 +51,14 @@ std::optional<std::string> Metal::VideoBackend::GetWarningMessage() const
 
   return std::nullopt;
 }
+
+std::unique_ptr<AbstractSwapChain> Metal::VideoBackend::CreateSwapChain(void* window_handle,
+                                                                        int width, int height)
+{
+  return std::make_unique<MTLSwapChain>(window_handle, width, height);
+}
+
+bool Metal::VideoBackend::SupportsViewports() { return true; }
 
 static bool WindowSystemTypeSupportsMetal(WindowSystemType type)
 {
@@ -127,7 +136,7 @@ bool Metal::VideoBackend::Initialize(const WindowSystemInfo& wsi)
 
     return InitializeShared(
         std::make_unique<Metal::Gfx>(std::move(layer)), std::make_unique<Metal::VertexManager>(),
-        std::make_unique<Metal::PerfQuery>(), std::make_unique<Metal::BoundingBox>());
+        std::make_unique<Metal::PerfQuery>(), std::make_unique<Metal::BoundingBox>(), wsi.SetupImgui, wsi.render_window);
   }
 }
 

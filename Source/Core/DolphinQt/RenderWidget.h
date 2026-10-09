@@ -5,6 +5,7 @@
 
 #include <QEvent>
 #include <QWidget>
+#include <QtGui/qevent.h>
 
 class QMouseEvent;
 class QTimer;
@@ -32,6 +33,9 @@ signals:
   void SizeChanged(int new_width, int new_height);
   void FocusChanged(bool focus);
 
+protected:
+  void moveEvent(QMoveEvent *event) override;
+  void resizeEvent(QResizeEvent *event) override;
 private:
   void HandleCursorTimer();
   void OnHandleChanged(void* handle);

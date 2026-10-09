@@ -289,14 +289,15 @@ void VideoBackendBase::DoState(PointerWrap& p)
 bool VideoBackendBase::InitializeShared(std::unique_ptr<AbstractGfx> gfx,
                                         std::unique_ptr<VertexManagerBase> vertex_manager,
                                         std::unique_ptr<PerfQueryBase> perf_query,
-                                        std::unique_ptr<BoundingBox> bounding_box)
+                                        std::unique_ptr<BoundingBox> bounding_box,
+                                        void (*imgui_setup)(void*, void*), void* window_handle)
 {
   // All hardware backends use the default EFBInterface and TextureCacheBase.
   // Only Null and Software backends override them
 
   return InitializeShared(std::move(gfx), std::move(vertex_manager), std::move(perf_query),
                           std::move(bounding_box), std::make_unique<HardwareEFBInterface>(),
-                          std::make_unique<TextureCacheBase>());
+                          std::make_unique<TextureCacheBase>(), imgui_setup, window_handle);
 }
 
 bool VideoBackendBase::InitializeShared(std::unique_ptr<AbstractGfx> gfx,
@@ -304,7 +305,8 @@ bool VideoBackendBase::InitializeShared(std::unique_ptr<AbstractGfx> gfx,
                                         std::unique_ptr<PerfQueryBase> perf_query,
                                         std::unique_ptr<BoundingBox> bounding_box,
                                         std::unique_ptr<EFBInterfaceBase> efb_interface,
-                                        std::unique_ptr<TextureCacheBase> texture_cache)
+                                        std::unique_ptr<TextureCacheBase> texture_cache,
+                                        void (*imgui_setup)(void*, void*), void* window_handle)
 {
   memset(reinterpret_cast<u8*>(&g_main_cp_state), 0, sizeof(g_main_cp_state));
   memset(reinterpret_cast<u8*>(&g_preprocess_cp_state), 0, sizeof(g_preprocess_cp_state));
@@ -330,7 +332,7 @@ bool VideoBackendBase::InitializeShared(std::unique_ptr<AbstractGfx> gfx,
   g_widescreen = std::make_unique<WidescreenManager>();
 
   if (!g_vertex_manager->Initialize() || !g_shader_cache->Initialize() ||
-      !g_perf_query->Initialize() || !g_presenter->Initialize() ||
+      !g_perf_query->Initialize() || !g_presenter->Initialize(imgui_setup, window_handle) ||
       !g_framebuffer_manager->Initialize(g_ActiveConfig.iEFBScale) ||
       !g_texture_cache->Initialize() ||
       (g_backend_info.bSupportsBBox && !g_bounding_box->Initialize()) ||

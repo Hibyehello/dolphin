@@ -655,14 +655,16 @@ std::string GenerateImGuiVertexShader()
   EmitUniformBufferDeclaration(code);
   code.Write("{{\n"
              "float2 u_rcp_viewport_size_mul2;\n"
+             "float2 u_display_pos;\n"
              "}};\n\n");
 
   EmitVertexMainDeclaration(code, 1, 1, true, 1, 1);
   code.Write("{{\n"
              "  v_tex0 = float3(rawtex0.xy, 0.0);\n"
              "  v_col0 = rawcolor0;\n"
-             "  opos = float4(rawpos.x * u_rcp_viewport_size_mul2.x - 1.0,"
-             "                1.0 - rawpos.y * u_rcp_viewport_size_mul2.y, 0.0, 1.0);\n");
+             "  float2 localpos = rawpos.xy - u_display_pos;\n"
+             "  opos = float4(localpos.x * u_rcp_viewport_size_mul2.x - 1.0,"
+             "                1.0 - localpos.y * u_rcp_viewport_size_mul2.y, 0.0, 1.0);\n");
 
   // NDC space is flipped in Vulkan.
   if (GetAPIType() == APIType::Vulkan)

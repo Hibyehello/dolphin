@@ -70,6 +70,8 @@ static float DrawMessage(int index, Message& msg, const ImVec2& position, int ti
   // So instead, we generate a name based on the number of messages drawn.
   const std::string window_name = fmt::format("osd_{}", index);
 
+  ImVec2 raw_position = ImVec2(position.x + ImGui::GetMainViewport()->Pos.x, position.y + ImGui::GetMainViewport()->Pos.y);
+
   // The size must be reset, otherwise the length of old messages could influence new ones.
   ImGui::SetNextWindowPos(position);
   ImGui::SetNextWindowSize(ImVec2(0.0f, 0.0f));

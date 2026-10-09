@@ -3,6 +3,9 @@
 
 #include "DolphinQt/RenderWidget.h"
 
+#include <QtGui/qevent.h>
+#include <QtWidgets/qwidget.h>
+#include <imgui.h>
 #include <QApplication>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -191,6 +194,22 @@ void RenderWidget::OnKeepOnTopChanged(bool top)
   m_dont_lock_cursor_on_show = false;
 
   UpdateCursor();
+}
+
+void RenderWidget::moveEvent(QMoveEvent* event)
+{
+  if (Core::IsRunning(Core::System::GetInstance()))
+    g_presenter->UpdateMainViewportPos(this->window()->frameGeometry().topLeft().x(), this->window()->frameGeometry().topLeft().y());
+
+  QWidget::moveEvent(event);
+}
+
+void RenderWidget::resizeEvent(QResizeEvent* event)
+{
+  if (Core::IsRunning(Core::System::GetInstance()))
+    g_presenter->UpdateMainViewportSize(event->size().width(), event->size().height(), this->window()->devicePixelRatio());
+
+  QWidget::resizeEvent(event);
 }
 
 void RenderWidget::HandleCursorTimer()
@@ -550,9 +569,8 @@ void RenderWidget::PassEventToPresenter(const QEvent* event)
     // Qt multiplies all coordinates by the scaling factor in highdpi mode, giving us "scaled" mouse
     // coordinates (as if the screen was standard dpi). We need to update the mouse position in
     // native coordinates, as the UI (and game) is rendered at native resolution.
-    const float scale = devicePixelRatio();
-    float x = static_cast<const QMouseEvent*>(event)->pos().x() * scale;
-    float y = static_cast<const QMouseEvent*>(event)->pos().y() * scale;
+    float x = static_cast<const QMouseEvent*>(event)->globalPosition().x();
+    float y = static_cast<const QMouseEvent*>(event)->globalPosition().y();
 
     g_presenter->SetMousePos(x, y);
   }

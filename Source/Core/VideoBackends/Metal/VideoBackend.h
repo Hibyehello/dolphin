@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include "VideoCommon/VideoBackendBase.h"
 
@@ -17,6 +18,8 @@ public:
   std::string GetConfigName() const override;
   std::string GetDisplayName() const override;
   std::optional<std::string> GetWarningMessage() const override;
+  std::unique_ptr<AbstractSwapChain> CreateSwapChain(void* window_handle, int width, int height) override;
+  bool SupportsViewports() override;
 
   void InitBackendInfo(const WindowSystemInfo& wsi) override;
 

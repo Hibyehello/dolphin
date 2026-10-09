@@ -15,6 +15,7 @@
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
+#include "VideoCommon/Present.h"
 
 #ifdef _WIN32
 #include <windows.h>

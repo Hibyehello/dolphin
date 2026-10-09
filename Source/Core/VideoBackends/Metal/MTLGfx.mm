@@ -7,6 +7,7 @@
 #include "VideoBackends/Metal/MTLObjectCache.h"
 #include "VideoBackends/Metal/MTLPipeline.h"
 #include "VideoBackends/Metal/MTLStateTracker.h"
+#import "VideoBackends/Metal/MTLSwapChain.h"
 #include "VideoBackends/Metal/MTLTexture.h"
 #include "VideoBackends/Metal/MTLUtil.h"
 #include "VideoBackends/Metal/MTLVertexFormat.h"
@@ -16,14 +17,15 @@
 #include "VideoCommon/Present.h"
 #include "VideoCommon/VideoBackendBase.h"
 
+#import <QuartzCore/QuartzCore.h>
 #include <fstream>
 
-Metal::Gfx::Gfx(MRCOwned<CAMetalLayer*> layer) : m_layer(std::move(layer))
+Metal::Gfx::Gfx(MRCOwned<CAMetalLayer*> layer)
 {
   UpdateActiveConfig();
-  [m_layer setDisplaySyncEnabled:g_ActiveConfig.bVSyncActive];
+  [layer setDisplaySyncEnabled:g_ActiveConfig.bVSyncActive];
 
-  SetupSurface();
+  SetupSurface(layer);
   g_state_tracker->FlushEncoders();
 }
 
@@ -31,7 +33,7 @@ Metal::Gfx::~Gfx() = default;
 
 bool Metal::Gfx::IsHeadless() const
 {
-  return m_layer == nullptr;
+  return !m_swapchain || m_swapchain->getLayer() == nullptr;
 }
 
 // MARK: Texture Creation
@@ -289,7 +291,7 @@ void Metal::Gfx::OnConfigChanged(u32 bits)
   AbstractGfx::OnConfigChanged(bits);
 
   if (bits & CONFIG_CHANGE_BIT_VSYNC)
-    [m_layer setDisplaySyncEnabled:g_ActiveConfig.bVSyncActive];
+    [m_swapchain->getLayer() setDisplaySyncEnabled:g_ActiveConfig.bVSyncActive];
 
   if (bits & CONFIG_CHANGE_BIT_ANISOTROPY)
   {
@@ -454,10 +456,7 @@ bool Metal::Gfx::BindBackbuffer(const ClearColor& clear_color)
   {
     CheckForSurfaceChange();
     CheckForSurfaceResize();
-    m_drawable = MRCRetain([m_layer nextDrawable]);
-    m_backbuffer->UpdateBackbufferTexture([m_drawable texture]);
-    SetAndClearFramebuffer(m_backbuffer.get(), clear_color);
-    return m_drawable != nullptr;
+    return m_swapchain->BindBackBuffer(clear_color);
   }
 }
 
@@ -466,21 +465,9 @@ void Metal::Gfx::PresentBackbuffer()
   @autoreleasepool
   {
     g_state_tracker->EndRenderPass();
-    if (m_drawable)
+    if (m_swapchain)
     {
-      // PresentDrawable refuses to allow Dolphin to present faster than the display's refresh rate
-      // when windowed (or fullscreen with vsync enabled, but that's more understandable).
-      // On the other hand, it helps Xcode's GPU captures start and stop on frame boundaries
-      // which is convenient.  Put it here as a default-off config, which we can override in Xcode.
-      // It also seems to improve frame pacing, so enable it by default with vsync
-      if (g_ActiveConfig.iUsePresentDrawable == TriState::On ||
-          (g_ActiveConfig.iUsePresentDrawable == TriState::Auto && g_ActiveConfig.bVSyncActive))
-        [g_state_tracker->GetRenderCmdBuf() presentDrawable:m_drawable];
-      else
-        [g_state_tracker->GetRenderCmdBuf()
-            addScheduledHandler:[drawable = std::move(m_drawable)](id) { [drawable present]; }];
-      m_backbuffer->UpdateBackbufferTexture(nullptr);
-      m_drawable = nullptr;
+      m_swapchain->Present(); 
     }
     g_state_tracker->FlushEncoders();
   }
@@ -490,41 +477,41 @@ void Metal::Gfx::CheckForSurfaceChange()
 {
   if (!g_presenter->SurfaceChangedTestAndClear())
     return;
-  m_layer = MRCRetain(static_cast<CAMetalLayer*>(g_presenter->GetNewSurfaceHandle()));
-  SetupSurface();
+  MRCOwned<CAMetalLayer*> layer = MRCRetain(static_cast<CAMetalLayer*>(g_presenter->GetNewSurfaceHandle()));
+  SetupSurface(layer);
 }
 
 void Metal::Gfx::CheckForSurfaceResize()
 {
   if (!g_presenter->SurfaceResizedTestAndClear())
     return;
-  SetupSurface();
+
+  if (m_swapchain)
+  {
+    const auto info = GetSurfaceInfo();
+    m_swapchain->Resize(info.width, info.height);
+    g_presenter->SetBackbuffer(info);
+  }
 }
 
-void Metal::Gfx::SetupSurface()
+void Metal::Gfx::SetupSurface(MRCOwned<CAMetalLayer*> layer)
 {
+  m_swapchain = std::make_unique<MTLSwapChain>(layer, [layer drawableSize].width, [layer drawableSize].height);
+
   auto info = GetSurfaceInfo();
-
-  [m_layer setDrawableSize:{static_cast<double>(info.width), static_cast<double>(info.height)}];
-
-  TextureConfig cfg(info.width, info.height, 1, 1, 1, info.format, AbstractTextureFlag_RenderTarget,
-                    AbstractTextureType::Texture_2DArray);
-  m_bb_texture = std::make_unique<Texture>(nullptr, cfg);
-  m_backbuffer = std::make_unique<Framebuffer>(
-      m_bb_texture.get(), nullptr, std::vector<AbstractTexture*>{}, info.width, info.height, 1, 1);
-
   if (g_presenter)
     g_presenter->SetBackbuffer(info);
 }
 
 SurfaceInfo Metal::Gfx::GetSurfaceInfo() const
 {
-  if (!m_layer)  // Headless
+  CAMetalLayer* layer = m_swapchain->getLayer();
+  if (!layer)  // Headless
     return {};
 
-  CGSize size = [m_layer bounds].size;
-  const float scale = [m_layer contentsScale];
+  CGSize size = [layer bounds].size;
+  const float scale = [layer contentsScale];
 
   return {static_cast<u32>(size.width * scale), static_cast<u32>(size.height * scale), scale,
-          Util::ToAbstract([m_layer pixelFormat])};
+          Util::ToAbstract([layer pixelFormat])};
 }

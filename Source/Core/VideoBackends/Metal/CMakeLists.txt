@@ -15,6 +15,8 @@ add_library(videometal
   MTLShader.h
   MTLStateTracker.mm
   MTLStateTracker.h
+  MTLSwapChain.mm
+  MTLSwapChain.h
   MTLTexture.mm
   MTLTexture.h
   MTLUtil.mm

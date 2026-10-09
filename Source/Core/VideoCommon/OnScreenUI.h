@@ -10,7 +10,10 @@
 #include <vector>
 
 #include "Common/CommonTypes.h"
+#include "VideoCommon/AbstractSwapChain.h"
 #include "VideoCommon/OnScreenUIKeyMap.h"
+
+#include <imgui/imgui.h>
 
 class NativeVertexFormat;
 class AbstractTexture;
@@ -19,6 +22,12 @@ struct ImTextureData;
 
 namespace VideoCommon
 {
+
+struct OnScreenUI_ViewportData
+{
+  std::unique_ptr<::AbstractSwapChain> swapchain;
+};
+
 // OnScreenUI handles all the ImGui rendering.
 class OnScreenUI
 {
@@ -27,7 +36,7 @@ public:
   ~OnScreenUI();
 
   // ImGui initialization depends on being able to create textures and pipelines, so do it last.
-  bool Initialize(u32 width, u32 height, float scale);
+  bool Initialize(u32 width, u32 height, float scale, void (*imgui_setup)(void*, void*), void* window_handle);
 
   // Returns a lock for the ImGui mutex, enabling data structures to be modified from outside.
   // Use with care, only non-drawing functions should be called from outside the video thread,
@@ -45,14 +54,14 @@ public:
 
   // Renders ImGui windows to the currently-bound framebuffer.
   // Should be called with the ImGui lock held.
-  void DrawImGui();
+  void DrawImGui(ImDrawData* draw_data = nullptr);
 
   // Recompiles ImGui pipeline - call when stereo mode changes.
   bool RecompileImGuiPipeline();
 
   void SetScale(float backbuffer_scale);
 
-  void Finalize();
+  ImDrawData* Finalize();
 
   // Receive keyboard and mouse from QT
   void SetKeyMap(const DolphinKeyMap& key_map);
@@ -60,10 +69,18 @@ public:
   void SetMousePos(float x, float y);
   void SetMousePress(u32 button_mask);
 
+  void UpdateMainViewportPos(float x, float y);
+  void UpdateMainViewportSize(u32 width, u32 height, float scale);
+
 private:
   void DrawDebugText();
   void DrawChallengesAndLeaderboards();
   void UpdateImguiTexture(ImTextureData* tex);
+
+  void OnScreenUI_CreateWindow(ImGuiViewport* vp);
+  void OnScreenUI_DestroyWindow(ImGuiViewport* vp);
+  void OnScreenUI_SetWindowSize(ImGuiViewport* vp, ImVec2 size);
+  void OnScreenUI_RenderWindow(ImGuiViewport* vp, void*);
 
   // ImGui resources.
   std::unique_ptr<NativeVertexFormat> m_imgui_vertex_format;

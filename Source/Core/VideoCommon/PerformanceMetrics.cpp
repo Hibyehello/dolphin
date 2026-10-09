@@ -12,6 +12,7 @@
 #include "Core/Config/GraphicsSettings.h"
 #include "Core/Core.h"
 #include "VideoCommon/VideoConfig.h"
+#include "imgui_internal.h"
 
 PerformanceMetrics::PerformanceMetrics()
 {
@@ -118,11 +119,13 @@ void PerformanceMetrics::DrawImGuiStats(const float backbuffer_scale)
   m_vps_counter.UpdateStats();
   m_fps_counter.UpdateStats();
 
-  const bool movable_overlays = Config::Get(Config::GFX_MOVABLE_PERFORMANCE_METRICS);
+  const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+
+  const bool movable_overlays = true;//Config::Get(Config::GFX_MOVABLE_PERFORMANCE_METRICS);
   const int movable_flag = movable_overlays ? ImGuiWindowFlags_None : ImGuiWindowFlags_NoMove;
 
   const float bg_alpha = 0.7f;
-  const auto imgui_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings |
+  const auto imgui_flags = ImGuiWindowFlags_NoSavedSettings |
                            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav | movable_flag |
                            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing;
 
@@ -141,22 +144,22 @@ void PerformanceMetrics::DrawImGuiStats(const float backbuffer_scale)
     b = (speed - 0.9) / 0.1;
   }
 
-  const float window_padding = 8.f * backbuffer_scale;
+  const float window_padding = 8.f;
 
-  const ImVec2& display_size = ImGui::GetIO().DisplaySize;
+  const ImVec2& display_size = ImGui::GetViewportPlatformMonitor(ImGui::GetMainViewport())->WorkSize;
   const bool display_size_changed =
       display_size.x != last_display_size.x || display_size.y != last_display_size.y;
   last_display_size = display_size;
   // There are too many edge cases to reasonably handle when the display size changes, so just reset
   // the layout to default. Hopefully users aren't changing window sizes or resolutions too often.
   const ImGuiCond set_next_position_condition =
-      (display_size_changed || !movable_overlays) ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
+      !movable_overlays ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
   // Reset the graph size when changing resolutions, and otherwise let the user manually resize it.
   const ImGuiCond set_next_size_condition =
       display_size_changed ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
 
-  float window_y = window_padding;
-  float window_x = display_size.x - window_padding;
+  float window_y = window_padding + main_viewport->Pos.y;
+  float window_x = display_size.x - window_padding + main_viewport->Pos.x;
 
   const auto clamp_window_position = [&] {
     const ImVec2 position = ImGui::GetWindowPos();
@@ -178,8 +181,8 @@ void PerformanceMetrics::DrawImGuiStats(const float backbuffer_scale)
       ImGui::SetWindowPos(ImVec2(clamped_window_x, clamped_window_y), ImGuiCond_Always);
   };
 
-  const float min_auto_graph_width = 200.f * backbuffer_scale + 2.f * window_padding;
-  const float min_auto_graph_height = 144.f * backbuffer_scale + 2.f * window_padding;
+  const float min_auto_graph_width = 200.f + 2.f * window_padding;
+  const float min_auto_graph_height = 144.f + 2.f * window_padding;
 
   const float graph_width = std::max(min_auto_graph_width, display_size.x / 4.f);
   const float graph_height = std::max(min_auto_graph_height, display_size.y / 4.f);
@@ -187,16 +190,16 @@ void PerformanceMetrics::DrawImGuiStats(const float backbuffer_scale)
   const bool stack_vertically = !g_ActiveConfig.bShowGraphs;
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 14.f * backbuffer_scale);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 14.f);
   if (g_ActiveConfig.bShowGraphs)
   {
     // A font size of 13 is small enough to keep the tick numbers from overlapping too much.
     ImGui::PushFont(nullptr, 13.0f);
     ImGui::PushStyleColor(ImGuiCol_ResizeGrip, 0);
-    const auto graph_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings |
+    const auto graph_flags = ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav | movable_flag |
                              ImGuiWindowFlags_NoFocusOnAppearing;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 4.f * backbuffer_scale));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 4.f));
 
     // Position in the top-right corner of the screen.
     ImGui::SetNextWindowPos(ImVec2(window_x, window_y), set_next_position_condition,
@@ -249,7 +252,7 @@ void PerformanceMetrics::DrawImGuiStats(const float backbuffer_scale)
         ImPlot::PushStyleColor(ImPlotCol_PlotBg, {0, 0, 0, 0});
         ImPlot::PushStyleColor(ImPlotCol_LegendBg, {0, 0, 0, 0.2f});
         ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, ImVec2(0.f, 0.f));
-        ImPlot::PushStyleVar(ImPlotStyleVar_LineWeight, 1.5f * backbuffer_scale);
+        ImPlot::PushStyleVar(ImPlotStyleVar_LineWeight, 1.5f);
         ImPlot::SetupAxes(nullptr, nullptr,
                           ImPlotAxisFlags_Lock | ImPlotAxisFlags_Invert |
                               ImPlotAxisFlags_NoDecorations | ImPlotAxisFlags_NoHighlight,

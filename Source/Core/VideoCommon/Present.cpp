@@ -23,6 +23,7 @@
 #include "VideoCommon/VideoConfig.h"
 #include "VideoCommon/VideoEvents.h"
 #include "VideoCommon/Widescreen.h"
+#include "imgui.h"
 
 std::unique_ptr<VideoCommon::Presenter> g_presenter;
 
@@ -110,7 +111,7 @@ Presenter::~Presenter()
   g_controller_interface.SetAspectRatioAdjustment(1);
 }
 
-bool Presenter::Initialize()
+bool Presenter::Initialize(void (*imgui_setup)(void*, void*), void* window_handle)
 {
   UpdateDrawRectangle();
 
@@ -125,7 +126,7 @@ bool Presenter::Initialize()
       return false;
 
     m_onscreen_ui = std::make_unique<OnScreenUI>();
-    if (!m_onscreen_ui->Initialize(m_backbuffer_width, m_backbuffer_height, m_backbuffer_scale))
+    if (!m_onscreen_ui->Initialize(m_backbuffer_width, m_backbuffer_height, m_backbuffer_scale, imgui_setup, window_handle))
       return false;
 
     // Draw a blank frame (and complete OnScreenUI initialization)
@@ -949,9 +950,13 @@ void Presenter::Present(PresentInfo* present_info)
 
   if (m_onscreen_ui)
   {
-    m_onscreen_ui->Finalize();
+    ImDrawData* draw_data = m_onscreen_ui->Finalize();
     if (backbuffer_bound)
-      m_onscreen_ui->DrawImGui();
+      m_onscreen_ui->DrawImGui(draw_data);
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+      ImGui::RenderPlatformWindowsDefault();
   }
 
   // Present to the window system.
@@ -1036,6 +1041,17 @@ void Presenter::SetMousePress(u32 button_mask)
 {
   if (m_onscreen_ui)
     m_onscreen_ui->SetMousePress(button_mask);
+}
+
+void Presenter::UpdateMainViewportPos(float x, float y) {
+  if (m_onscreen_ui)
+    m_onscreen_ui->UpdateMainViewportPos(x, y);
+}
+
+void Presenter::UpdateMainViewportSize(u32 width, u32 height, float scale)
+{
+  if (m_onscreen_ui)
+    m_onscreen_ui->UpdateMainViewportSize(width, height, scale);
 }
 
 void Presenter::DoState(PointerWrap& p)

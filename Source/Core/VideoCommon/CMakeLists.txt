@@ -6,6 +6,8 @@ add_library(videocommon
   AbstractShader.h
   AbstractStagingTexture.cpp
   AbstractStagingTexture.h
+  AbstractSwapChain.cpp
+  AbstractSwapChain.h
   AbstractTexture.cpp
   AbstractTexture.h
   Assets/AssetListener.h

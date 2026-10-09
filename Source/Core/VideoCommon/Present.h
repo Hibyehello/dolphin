@@ -44,7 +44,7 @@ public:
   void Present(PresentInfo* present_info = nullptr);
   void ClearLastXfbId() { m_last_xfb_id = std::numeric_limits<u64>::max(); }
 
-  bool Initialize();
+  bool Initialize(void (*imgui_setup)(void*, void*) = nullptr, void* window_handle = nullptr);
 
   void ConfigChanged(u32 changed_bits);
 
@@ -102,6 +102,9 @@ public:
   void SetKey(u32 key, bool is_down, const char* chars);
   void SetMousePos(float x, float y);
   void SetMousePress(u32 button_mask);
+
+  void UpdateMainViewportPos(float x, float y);
+  void UpdateMainViewportSize(u32 width, u32 height, float scale);
 
   int FrameCount() const { return m_frame_count; }
 

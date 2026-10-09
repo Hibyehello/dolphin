@@ -10,6 +10,7 @@
 
 #include "Common/CommonTypes.h"
 #include "Common/WindowSystemInfo.h"
+#include "VideoCommon/AbstractSwapChain.h"
 #include "VideoCommon/PerfQueryBase.h"
 
 namespace MMIO
@@ -41,6 +42,8 @@ public:
   virtual std::string GetDisplayName() const { return GetConfigName(); }
   virtual void InitBackendInfo(const WindowSystemInfo& wsi) = 0;
   virtual std::optional<std::string> GetWarningMessage() const { return {}; }
+  virtual std::unique_ptr<AbstractSwapChain> CreateSwapChain(void* window_handle, int width, int height) { return nullptr; } // For implementations with no ImGui Viewport support
+  virtual bool SupportsViewports() { return false; }
 
   // Prepares a native window for rendering. This is called on the main thread, or the
   // thread which owns the window.
@@ -69,7 +72,8 @@ protected:
   bool InitializeShared(std::unique_ptr<AbstractGfx> gfx,
                         std::unique_ptr<VertexManagerBase> vertex_manager,
                         std::unique_ptr<PerfQueryBase> perf_query,
-                        std::unique_ptr<BoundingBox> bounding_box);
+                        std::unique_ptr<BoundingBox> bounding_box,
+                        void (*imgui_setup)(void*, void*) = nullptr, void* window_handle = nullptr);
 
   // For software and null backends. Allows overriding the default EFBInterface and TextureCache
   bool InitializeShared(std::unique_ptr<AbstractGfx> gfx,
@@ -77,7 +81,8 @@ protected:
                         std::unique_ptr<PerfQueryBase> perf_query,
                         std::unique_ptr<BoundingBox> bounding_box,
                         std::unique_ptr<EFBInterfaceBase> efb_interface,
-                        std::unique_ptr<TextureCacheBase> texture_cache);
+                        std::unique_ptr<TextureCacheBase> texture_cache,
+                        void (*imgui_setup)(void*, void*) = nullptr, void* window_handle = nullptr);
   void ShutdownShared();
 
   bool m_initialized = false;

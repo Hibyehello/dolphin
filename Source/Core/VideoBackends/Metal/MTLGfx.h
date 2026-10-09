@@ -5,7 +5,9 @@
 
 #include <Metal/Metal.h>
 #include <QuartzCore/QuartzCore.h>
+#include <memory>
 
+#include "VideoBackends/Metal/MTLSwapChain.h"
 #include "VideoCommon/AbstractGfx.h"
 
 #include "VideoBackends/Metal/MRCHelpers.h"
@@ -75,16 +77,13 @@ public:
   SurfaceInfo GetSurfaceInfo() const override;
 
 private:
-  MRCOwned<CAMetalLayer*> m_layer;
-  MRCOwned<id<CAMetalDrawable>> m_drawable;
-  std::unique_ptr<Texture> m_bb_texture;
-  std::unique_ptr<Framebuffer> m_backbuffer;
+  std::unique_ptr<MTLSwapChain> m_swapchain;
   u32 m_texture_counter = 0;
   u32 m_staging_texture_counter = 0;
   std::array<u32, 4> m_shader_counter = {};
 
   void CheckForSurfaceChange();
   void CheckForSurfaceResize();
-  void SetupSurface();
+  void SetupSurface(MRCOwned<CAMetalLayer*> layer);
 };
 }  // namespace Metal
